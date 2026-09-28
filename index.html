@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2a0d3d">
+  <title>南开记忆修复计划</title>
+  <link rel="stylesheet" href="styles.css?v=10">
+</head>
+<body>
+  <a class="skip-link" href="#game">跳到游戏内容</a>
+  <main id="game" class="game-shell" aria-live="polite">
+    <section id="intro" class="screen intro-screen">
+      <div class="intro-vignette" aria-hidden="true"></div>
+      <div class="intro-copy">
+        <p class="archive-mark">南开大学档案馆 · 记忆修复任务</p>
+        <h1>南开记忆<br>修复计划</h1>
+        <p class="intro-lead">一册校史影像因战火、迁校与年代流转而散佚。沿校园地标寻找档案线索，让失落的照片重新显影。</p>
+        <blockquote>“南开南开，越难越开。”</blockquote>
+        <div class="intro-actions">
+          <button id="enterGame" class="primary-button">接受修复任务</button>
+          <button id="resetGame" class="text-button">重新开始</button>
+        </div>
+      </div>
+      <div class="intro-file" aria-label="任务档案摘要">
+        <span>档案编号 NK-1919</span>
+        <strong>散佚影像：14</strong>
+        <span>修复员：待登记</span>
+      </div>
+    </section>
+
+    <section id="mapScreen" class="screen map-screen" hidden>
+      <header class="game-header">
+        <div>
+          <p>校史影像修复行动</p>
+          <h1>南开记忆修复计划</h1>
+        </div>
+        <nav id="chapterNav" class="chapter-nav" aria-label="校史年代章节"></nav>
+        <div class="header-progress" aria-label="总体修复进度">
+          <span>已修复</span>
+          <strong><b id="restoredCount">0</b> / 14</strong>
+          <div class="progress-track"><i id="overallProgress"></i></div>
+        </div>
+      </header>
+
+      <div class="map-layout">
+        <section id="mapViewport" class="campus-map" aria-label="可横向移动的南开记忆路线图，不代表真实地理比例" tabindex="0">
+          <div id="mapWorld" class="map-world">
+            <div class="map-caption"><span id="chapterMapTitle">1919—1948</span><small id="chapterMapSubtitle">私立南开、战火南迁与复校</small></div>
+            <div id="stageNodes"></div>
+            <div id="studentAvatar" class="student-avatar" aria-label="校史记忆修复员，目前位于校钟">
+              <img src="assets/student-restorer.png" alt="身穿南开紫外套、携带档案包的学生修复员">
+              <span id="studentLocation">修复员 · 校钟</span>
+            </div>
+            <aside id="mapAgent" class="map-agent" aria-live="polite">
+              <button id="mapAgentHandle" class="map-agent-mascot" type="button" aria-expanded="true" aria-controls="mapAgentBubble" title="拖动荷宝；点击展开或收起提示">
+                <img src="assets/hebao-guide.png" alt="莲藕身体、荷叶帽和荷花包的校史智能体荷宝">
+                <span>荷宝</span>
+              </button>
+              <div id="mapAgentBubble" class="map-agent-bubble">
+                <button id="mapAgentDismiss" class="map-agent-dismiss" type="button">收起</button>
+                <strong>荷宝 · 校史引导智能体</strong>
+                <p id="mapAgentSpeech">修复员，我们从校钟开始。点击地标，核验第一组档案。</p>
+                <small id="mapAgentSource" class="agent-source" hidden></small>
+              </div>
+            </aside>
+            <div class="map-hud">点击已抵达的建筑进入关卡 · 完成修复后前往下一站</div>
+          </div>
+        </section>
+
+        <aside id="stagePanel" class="stage-panel parchment" aria-label="关卡档案">
+          <button id="closeStagePanel" class="panel-close" aria-label="关闭关卡档案">×</button>
+          <div class="panel-stamp">ARCHIVE</div>
+          <p id="stageRoute" class="stage-route">记忆路线 · 第一站</p>
+          <h2 id="stageTitle">校钟</h2>
+          <p id="stageSubtitle" class="stage-subtitle"></p>
+          <div class="photo-frame">
+            <img id="stagePhoto" src="assets/archive-opening.jpg" alt="本关待修复档案影像">
+            <div id="photoMask" class="photo-mask" aria-hidden="true"></div>
+          </div>
+          <div class="stage-meta">
+            <span id="stageStatus">等待修复</span>
+            <span id="stageScore">0 / 3 题</span>
+          </div>
+          <p id="stageBrief" class="stage-brief"></p>
+          <button id="startStage" class="primary-button">进入档案现场</button>
+          <p class="agent-note"><span>荷宝</span> 会根据你的作答情况主动提供线索。</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="quizScreen" class="screen quiz-screen" hidden>
+      <header class="quiz-topbar">
+        <button id="backToMap" class="icon-button" aria-label="返回地图">←</button>
+        <div><small id="quizStageRoute"></small><h1 id="quizStageTitle"></h1></div>
+        <div id="questionCounter" class="question-counter">1 / 3</div>
+      </header>
+      <div class="quiz-layout">
+        <aside class="evidence-desk parchment">
+          <p class="folio-label">待修复影像</p>
+          <div class="quiz-photo"><img id="quizPhoto" src="assets/archive-opening.jpg" alt="待修复照片"><div id="quizPhotoMask" class="photo-mask"></div></div>
+          <div class="fragment-row"><span></span><span></span><span></span></div>
+          <p id="evidencePrompt">每答对一题，一块影像碎片会重新显影。</p>
+        </aside>
+        <article class="question-card parchment">
+          <div class="question-heading"><span id="questionType">档案辨识</span><span id="difficulty">基础</span></div>
+          <h2 id="questionText"></h2>
+          <div id="options" class="options"></div>
+          <div class="question-actions">
+            <button id="clueButton" class="clue-button">查阅档案线索 <b id="clueCost">低提示度</b></button>
+            <button id="submitAnswer" class="primary-button" disabled>确认答案</button>
+          </div>
+          <div id="feedback" class="feedback" hidden></div>
+        </article>
+        <aside class="agent-card">
+          <div class="agent-portrait" aria-hidden="true"><img src="assets/hebao-guide.png" alt=""></div>
+          <div><strong>荷宝 · 校史引导智能体</strong><p id="agentSpeech">先观察题干里的时间与地点，它们是最可靠的检索词。</p><small id="agentSource" class="agent-source" hidden></small></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="storyScreen" class="screen story-screen" hidden>
+      <div class="woodcut-scene">
+        <div class="woodcut-rays"></div>
+        <div class="story-copy">
+          <p id="storyYear"></p>
+          <h1 id="storyTitle"></h1>
+          <p id="storyText"></p>
+          <p id="storySource" class="story-source"></p>
+        </div>
+      </div>
+      <aside class="restored-photo parchment">
+        <p>影像修复完成</p>
+        <img id="restoredPhoto" src="assets/archive-opening.jpg" alt="已修复的校史影像">
+        <h2 id="restoredCaption"></h2>
+        <p id="agentReview"></p>
+        <button id="continueJourney" class="primary-button">收录影像，继续寻迹</button>
+      </aside>
+    </section>
+  </main>
+  <script src="hebao-client.js?v=1"></script>
+  <script src="game.js?v=10"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+图像生成模式：参考图像转换 / 游戏地图素材
+
+统一地标提示词：
+用途为游戏地图地标透明素材。根据对应实景参考，制作精致南开校园像素风地标 sprite；32-bit 高精度像素艺术，3/4 俯视等距视角，主体居中、完整轮廓可见、四周保留透明安全边距，左上方柔和日光。必须使用真正透明背景和干净 alpha；不含人物、车辆、水印、标签、边框、UI 或可辨识文字；忠实保留真实建筑轮廓、比例和关键材料。
+
+参考与输出：
+- 马蹄湖：codex-clipboard-11d330c4-e2f4-4c0d-800f-81c34975c96e.png → landmark-mati.png
+- 秀山堂：codex-clipboard-c2eef745-63be-453c-91c6-e6786f822fc8.png → landmark-xiushan.png
+- 新开湖：codex-clipboard-2d76d5c3-a462-4d84-8000-9f309e650e98.png → landmark-xinkai.png
+- 海冰楼：codex-clipboard-38998ec8-bab7-462e-8a99-d220c17aa6fb.png → landmark-haibing.png
+- 文中馆：codex-clipboard-1f31dd70-44a0-4ae2-897b-acd204d5971c.png → landmark-wenzhong.png
+- 西南联大纪念碑：codex-clipboard-5373c6e5-3d6b-4adf-b78c-3fac775e55f1.png → landmark-lianda-memorial.png
+- 逸夫馆：codex-clipboard-3389d34f-6133-4976-a522-dab3dda1e76c.png → landmark-yifu.png
+
+第二、第三章背景提示词：
+以 campus-empty-plots.png 为视觉和构图基准，生成同系列 16:9 横向精致像素校园空地图。画面铺满，道路自然串联，中央布置克制水景；禁止出现主建筑、雕像、纪念碑、人物、车辆、文字、标签、UI 与边框。第二章体现重建校园的克制感，仅保留左上、右上、左下、右下共 4 个无遮挡地基；第三章以更通透的现代几何花坛和宽阔步道体现新世纪校园，保留上三、下二共 5 个地基。
+
+第一章背景修订：
+移除原图下方中央的第六块石铺地基，将其恢复为草坪、花坛、灌木与连接步道；严格保留上方三块、下方左右两块，共 5 块地基，其余构图保持不变。
+
+输出：
+- campus-empty-rebuild.png
+- campus-empty-renewal.png

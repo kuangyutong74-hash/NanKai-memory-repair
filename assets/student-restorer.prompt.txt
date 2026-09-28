@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: transparent game character sprite for a refined isometric pixel-art university campus map
+Primary request: one full-body Chinese university student, a friendly young adult campus-history archive restorer
+Subject: short dark hair, cream collared shirt, deep Nankai-purple cardigan, dark trousers, warm-brown crossbody archive satchel, holding a thin archival folder
+Style: polished 32-bit pixel art with crisp deliberate pixel clusters, readable at 64–96 px
+Composition: centered single character, forward-right three-quarter standing pose, full body and feet visible
+Constraints: genuine transparent background, clean alpha, exactly one student, no scenery, no building, no text, no logo, no watermark
