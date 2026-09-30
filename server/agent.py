@@ -95,9 +95,31 @@ class HebaoAgent:
             if context.get("completed", 0) >= context.get("total", 1):
                 text = "三个章节的校史影像已全部归档。你找回的不只是一册照片，也是南开人在时代中的选择。"
             elif context.get("travelling"):
-                text = f"上一站已经归档。我们正在前往{stage.get('title', '下一处地标')}。"
+                text = f"上一块照片碎片已经收入档案册。我们正在前往{stage.get('title', '下一处地标')}。"
             else:
-                text = f"当前任务：{stage.get('title', '校史地标')}。点击建筑，核验与它相关的档案。"
+                text = (
+                    f"当前任务：{stage.get('title', '校史地标')}。完成档案核验后，"
+                    f"可获得“{context.get('rewardTitle', '本章照片')}”的{context.get('fragmentName', '一块碎片')}。"
+                    f"本章已收集{context.get('chapterCollected', 0)}/{context.get('chapterTotal', 1)}块。"
+                )
+            citations = []
+        elif event == "route-locked":
+            target_stage = context.get("targetStage") or {}
+            target_chapter = context.get("targetChapter") or {}
+            prerequisite = context.get("prerequisite") or {}
+            next_stage = context.get("nextStage") or {}
+            if context.get("targetType") == "chapter":
+                text = (
+                    f"“{target_chapter.get('title', '后续章节')}”还没有解锁。"
+                    f"请先完成“{prerequisite.get('title', '当前章节最后一站')}”的影像修复，"
+                    f"现在应继续前往“{next_stage.get('title', '当前地标')}”。"
+                )
+            else:
+                text = (
+                    f"“{target_stage.get('title', '这处地标')}”的档案仍处于锁定状态。"
+                    f"请先完成“{prerequisite.get('title', '上一处地标')}”，"
+                    f"现在应继续前往“{next_stage.get('title', '当前地标')}”。"
+                )
             citations = []
         elif event == "question-intro":
             if context.get("wrongStreak", 0) >= 2:
@@ -120,9 +142,14 @@ class HebaoAgent:
             else:
                 text = "解释已经指出冲突的档案信息，带着它继续核验。"
         elif event == "stage-summary":
-            text = "你完整辨认了本关的时间、人物与事件，影像已高质量归档。" if context.get("correct") == 3 else "你已掌握本关主线。我把易混淆信息附在影像说明中，归档完成。"
+            if context.get("chapterComplete"):
+                text = f"本章所有档案均已核验，“{context.get('rewardTitle', '章节影像')}”的碎片已经完整拼合并正式归档。"
+            elif context.get("correct") == 3:
+                text = f"你完整辨认了本关的时间、人物与事件，已取得照片的{context.get('fragmentName', '对应区域')}。"
+            else:
+                text = f"你已掌握本关主线，照片的{context.get('fragmentName', '对应区域')}已经收入档案册。"
         elif event == "retry":
-            text = "本轮只完成了部分核验。修复一张影像至少需要通过2份档案，我们带着刚才的解释再核对一次。"
+            text = "本轮只完成了部分核验。取得照片碎片至少需要通过2份档案，我们带着刚才的解释再核对一次。"
             citations = []
         else:
             text = "目前的档案片段不足以处理这个请求。"

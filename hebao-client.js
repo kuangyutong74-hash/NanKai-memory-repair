@@ -26,6 +26,7 @@
     }
 
     guideMap(context) { return this.dispatch("map-guide", context, "map"); }
+    guardRoute(context) { return this.dispatch("route-locked", context, "map"); }
     introduceQuestion({ stage, question, questionIndex, wrongStreak }) { return this.dispatch("question-intro", { stage, question, questionIndex, wrongStreak }); }
     nudge({ stage, question }) { return this.dispatch("nudge", { stage, question }); }
     giveClue({ stage, question }) { return this.dispatch("clue", { stage, question }); }

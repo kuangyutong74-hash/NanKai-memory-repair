@@ -8,7 +8,7 @@
 const stageCatalog = [
   {
     id: "bell", title: "校钟", subtitle: "一声钟鸣，唤回百年公能记忆", x: 20.0, y: 18.0, walkX: 20, walkY: 42, sprite: "assets/landmark-bell.png",
-    brief: "辨认校钟铭文与南开早期的办学理想，修复一张关于南开精神象征的影像。",
+    brief: "辨认校钟铭文与南开早期的办学理想，完成核验后取得本章照片的一块碎片。",
     year: "1919—至今", storyTitle: "钟声里的办学理想",
     story: "南开创办之初设文、理、商三科。校钟铭文“文以治国、理以强国、商以富国”，把知识与救国理想联系在一起。钟声并不只是报时，也提醒每一代南开人把所学用于国家与社会。",
     source: "南开校园文化读本 · 第二章 校名与校园标识",
@@ -131,9 +131,42 @@ stageCatalog.push(
 );
 
 const chapters = [
-  { id: "origin", title: "1919—1948", subtitle: "私立南开、战火南迁与复校", background: "assets/campus-empty-origin-v2.png", stageIds: ["bell", "mati", "xiushan", "siyuan", "library"] },
-  { id: "rebuild", title: "1949—1978", subtitle: "院系调整与校园重建", background: "assets/campus-empty-rebuild.png", stageIds: ["xinkai", "haibing", "wenzhong", "main"] },
-  { id: "renewal", title: "1979—至今", subtitle: "开放发展、双校区与新的百年", background: "assets/campus-empty-renewal.png", stageIds: ["zhou", "lianda", "yifu", "today", "three"] }
+  {
+    id: "origin", title: "1919—1948", subtitle: "私立南开、战火南迁与复校", background: "assets/campus-empty-origin-v2.png", stageIds: ["bell", "mati", "xiushan", "siyuan", "library"],
+    introTitle: "在烽火中守住一所大学",
+    introText: "1919年，南开大学在教育救国的理想中创立。早期校园逐渐形成校钟、秀山堂、思源堂与木斋图书馆等重要空间。1937年校园遭日军轰炸，学校被迫南迁，并与北京大学、清华大学共同组成西南联合大学。抗战胜利后，南开回到天津复校，散失的校舍、书籍与影像也由此成为需要重新拼合的记忆。",
+    highlights: ["教育救国", "校园被炸", "西南联大", "天津复校"],
+    quote: "第一章任务：循着老校钟与早期建筑，找回战火中未曾中断的南开精神。",
+    rewardTitle: "南开大学开学典礼照片",
+    rewardImage: "assets/chapter-origin-opening-ceremony.jpg",
+    rewardCaption: "建校初期南开大学开学典礼合影",
+    fragmentStageIds: ["siyuan", "xiushan", "bell", "mati", "library"],
+    fragmentNames: ["左上角", "右上角", "中部左侧", "中部右侧", "底部全景"]
+  },
+  {
+    id: "rebuild", title: "1949—1978", subtitle: "院系调整与校园重建", background: "assets/campus-empty-rebuild.png", stageIds: ["xinkai", "haibing", "wenzhong", "main"],
+    introTitle: "让校园从废墟中重新生长",
+    introText: "新中国成立后，南开大学进入调整与重建时期。学科布局随国家高等教育建设不断变化，校园空间也持续更新：新开湖、海冰楼、文中馆与主楼，见证了教学、科研和公共文化生活的恢复。这里的每一处新地标，都连接着一代师生建设校园、服务国家的共同经历。",
+    highlights: ["院系调整", "校园重建", "学科发展", "公能传承"],
+    quote: "第二章任务：走进重建后的校园，辨认新中国南开的成长轨迹。",
+    rewardTitle: "复校与校园重建影像",
+    rewardImage: "assets/archive-destroyed.jpg",
+    rewardCaption: "复校与校园重建阶段影像（素材待档案馆复核）",
+    fragmentStageIds: ["xinkai", "haibing", "wenzhong", "main"],
+    fragmentNames: ["左上角", "右上角", "左下角", "右下角"]
+  },
+  {
+    id: "renewal", title: "1979—至今", subtitle: "开放发展、双校区与新的百年", background: "assets/campus-empty-renewal.png", stageIds: ["zhou", "lianda", "yifu", "today", "three"],
+    introTitle: "从百年记忆走向新的南开",
+    introText: "改革开放以来，南开大学在学科建设、人才培养与国际交流中迈入新的发展阶段。周恩来总理像、西南联大纪念碑与爱国三问碑，让历史精神持续进入当代校园；逸夫馆、津南中心馆以及双校区格局，则记录着知识空间与办学规模的拓展。百年校史不只被保存，也在新的校园生活中继续书写。",
+    highlights: ["改革开放", "双校区", "爱国三问", "新的百年"],
+    quote: "第三章任务：连接历史与当下，让散佚影像在今日南开重新显影。",
+    rewardTitle: "新时代双校区发展影像",
+    rewardImage: "assets/archive-today.jpg",
+    rewardCaption: "新时代南开校园发展影像（素材待档案馆复核）",
+    fragmentStageIds: ["zhou", "lianda", "yifu", "today", "three"],
+    fragmentNames: ["左上角", "右上角", "中部左侧", "中部右侧", "底部全景"]
+  }
 ];
 
 const catalogById = Object.fromEntries(stageCatalog.map(stage => [stage.id, stage]));
@@ -141,6 +174,21 @@ catalogById.bell.title = "老校钟";
 catalogById.main.title = "主楼";
 catalogById.today.title = "津南中心馆";
 const stages = chapters.flatMap(chapter => chapter.stageIds.map(id => catalogById[id]));
+const irregularFragments = {
+  4: [
+    { polygon: "polygon(0 0,52% 0,48% 45%,0 55%)", label: [25, 24] },
+    { polygon: "polygon(52% 0,100% 0,100% 48%,48% 45%)", label: [75, 24] },
+    { polygon: "polygon(0 55%,48% 45%,55% 100%,0 100%)", label: [25, 76] },
+    { polygon: "polygon(48% 45%,100% 48%,100% 100%,55% 100%)", label: [76, 76] }
+  ],
+  5: [
+    { polygon: "polygon(0 0,50% 0,52% 30%,38% 36%,0 32%)", label: [23, 16] },
+    { polygon: "polygon(50% 0,100% 0,100% 40%,68% 38%,52% 30%)", label: [76, 18] },
+    { polygon: "polygon(0 32%,38% 36%,45% 58%,30% 72%,0 68%)", label: [20, 51] },
+    { polygon: "polygon(38% 36%,52% 30%,68% 38%,100% 40%,100% 75%,66% 68%,45% 58%)", label: [73, 53] },
+    { polygon: "polygon(0 68%,30% 72%,45% 58%,66% 68%,100% 75%,100% 100%,0 100%)", label: [50, 86] }
+  ]
+};
 const mapPositions = {
   // 坐标对应各章背景中石铺空地的视觉中心；需要微调时只改这里。
   origin: [[20, 20], [45, 20], [72, 18], [20, 73], [76, 72]],
@@ -154,7 +202,7 @@ chapters.forEach(chapter => chapter.stageIds.forEach((id, index) => {
 
 function q(text, options, answer, explanation, clue) { return { text, options, answer, explanation, clue }; }
 
-const state = { completed: JSON.parse(localStorage.getItem("nankai-memory-progress") || "[]"), selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0 };
+const state = { completed: JSON.parse(localStorage.getItem("nankai-memory-progress") || "[]"), selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0, reviewMode: false };
 const $ = (id) => document.getElementById(id);
 const hebao = new HebaoClient({ endpoint: window.HEBAO_CONFIG?.endpoint || "/api/agent/event", onReply: presentAgent });
 let agentNudgeTimer = null;
@@ -183,22 +231,102 @@ function presentAgent(reply, surface = "quiz") {
   if (surface === "map") setMapAgentOpen(true, true);
 }
 
-function show(screen) { ["intro", "mapScreen", "quizScreen", "storyScreen"].forEach(id => $(id).hidden = id !== screen); window.scrollTo(0, 0); }
+function show(screen) { ["intro", "chapterIntro", "mapScreen", "quizScreen", "storyScreen"].forEach(id => $(id).hidden = id !== screen); window.scrollTo(0, 0); }
+function showChapterIntro(chapterIndex) {
+  activeChapterIndex = chapterIndex;
+  const chapter = chapters[chapterIndex], intro = $("chapterIntro");
+  $("chapterIntroPeriod").textContent = `${chapter.title} · ${chapter.subtitle}`;
+  $("chapterIntroTitle").textContent = chapter.introTitle;
+  $("chapterIntroText").textContent = chapter.introText;
+  $("chapterIntroQuote").textContent = `${chapter.quote} 本章影像目标：“${chapter.rewardTitle}”，共${chapter.stageIds.length}块。`;
+  $("chapterIntroHighlights").innerHTML = chapter.highlights.map(item => `<span>${item}</span>`).join("");
+  intro.style.setProperty("--chapter-image", `url("${chapter.background}")`);
+  intro.classList.remove("curtain-open");
+  show("chapterIntro");
+  requestAnimationFrame(() => requestAnimationFrame(() => intro.classList.add("curtain-open")));
+  const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 720;
+  setTimeout(() => $("enterChapter").focus(), delay);
+}
+function enterActiveChapter() {
+  renderMap();
+  show("mapScreen");
+  setTimeout(() => moveCameraTo(state.selected), 80);
+}
 function isUnlocked(index) { return index === 0 || state.completed.includes(stages[index - 1].id); }
 function chapterIndexForStage(index) { return chapters.findIndex(chapter => chapter.stageIds.includes(stages[index]?.id)); }
 function chapterStageIndices(chapterIndex = activeChapterIndex) { return chapters[chapterIndex].stageIds.map(id => stages.findIndex(stage => stage.id === id)); }
+function chapterCompletedCount(chapterIndex) {
+  return chapters[chapterIndex].stageIds.filter(id => state.completed.includes(id)).length;
+}
+function renderChapterPuzzle(container, chapterIndex, earnedStageId = "") {
+  const chapter = chapters[chapterIndex];
+  const completedPieces = chapter.fragmentStageIds.filter(id => state.completed.includes(id)).length;
+  container.innerHTML = "";
+  container.dataset.pieces = String(chapter.fragmentStageIds.length);
+  container.classList.toggle("complete", completedPieces === chapter.fragmentStageIds.length);
+  container.setAttribute("aria-label", `${chapter.rewardTitle}，已收集${completedPieces}/${chapter.fragmentStageIds.length}块`);
+
+  const image = document.createElement("img");
+  image.className = "puzzle-base";
+  image.src = chapter.rewardImage;
+  image.alt = chapter.rewardCaption;
+  container.appendChild(image);
+
+  const cover = document.createElement("div");
+  cover.className = "puzzle-fragments";
+  const shapes = irregularFragments[chapter.fragmentStageIds.length];
+  chapter.fragmentStageIds.forEach((stageId, position) => {
+    const piece = document.createElement("span");
+    const restored = state.completed.includes(stageId);
+    const shape = shapes[position];
+    piece.className = `puzzle-fragment ${restored ? "restored" : "locked"} ${stageId === earnedStageId ? "just-earned" : ""}`;
+    piece.dataset.stageId = stageId;
+    piece.style.setProperty("--fragment-shape", shape.polygon);
+    piece.style.setProperty("--label-x", `${shape.label[0]}%`);
+    piece.style.setProperty("--label-y", `${shape.label[1]}%`);
+    piece.style.setProperty("--puzzle-image", `url("${chapter.rewardImage}")`);
+    piece.innerHTML = restored ? "" : `<span class="fragment-label"><b>${catalogById[stageId].title}</b><small>${chapter.fragmentNames[position]} · 待寻回</small></span>`;
+    cover.appendChild(piece);
+  });
+  container.appendChild(cover);
+}
+function isChapterUnlocked(chapterIndex) {
+  if (chapterIndex === 0) return true;
+  return chapters.slice(0, chapterIndex).every(chapter => chapter.stageIds.every(id => state.completed.includes(id)));
+}
+function notifyLockedRoute({ targetStage = null, targetChapter = null, trigger = null }) {
+  const targetIndex = targetStage ? stages.indexOf(targetStage) : chapterStageIndices(chapters.indexOf(targetChapter))[0];
+  const prerequisite = stages[Math.max(0, targetIndex - 1)];
+  const nextStage = stages[reachedStageIndex()];
+  const reply = hebao.guardRoute({
+    targetType: targetChapter ? "chapter" : "stage",
+    targetStage,
+    targetChapter,
+    prerequisite,
+    nextStage
+  });
+  presentAgent(reply, "map");
+  if (trigger) {
+    trigger.classList.remove("denied");
+    requestAnimationFrame(() => trigger.classList.add("denied"));
+    setTimeout(() => trigger.classList.remove("denied"), 520);
+  }
+}
 function renderChapterNav() {
   const nav = $("chapterNav"); nav.innerHTML = "";
   chapters.forEach((chapter, index) => {
     const button = document.createElement("button"), chapterIndices = chapterStageIndices(index);
     const completed = chapterIndices.filter(stageIndex => state.completed.includes(stages[stageIndex].id)).length;
-    button.className = `chapter-tab ${index === activeChapterIndex ? "active" : ""}`;
+    const unlocked = isChapterUnlocked(index);
+    button.className = `chapter-tab ${index === activeChapterIndex ? "active" : ""} ${unlocked ? "" : "locked"}`;
     button.setAttribute("aria-current", index === activeChapterIndex ? "page" : "false");
-    button.innerHTML = `<strong>${chapter.title}</strong><span>${completed}/${chapterIndices.length}</span>`;
+    button.setAttribute("aria-label", `${chapter.title}，${unlocked ? `${completed}/${chapterIndices.length}块碎片已收集` : "尚未解锁，点击听取荷宝提示"}`);
+    button.innerHTML = `<strong>${chapter.title}</strong><span>${unlocked ? `${completed}/${chapterIndices.length}` : "尚未解锁"}</span>`;
     button.addEventListener("click", () => {
+      if (!unlocked) { notifyLockedRoute({ targetChapter: chapter, trigger: button }); return; }
       activeChapterIndex = index;
       state.selected = chapterIndices.includes(state.selected) ? state.selected : chapterIndices[0];
-      closeStagePanel(); renderMap();
+      closeStagePanel(); showChapterIntro(index);
     });
     nav.appendChild(button);
   });
@@ -213,12 +341,30 @@ function setStudentPosition(index, animate = false) {
   $("studentLocation").textContent = `修复员 · ${stage.title}`;
 }
 function updateMapAgent(index, travelling = false) {
-  const stage = stages[index];
-  presentAgent(hebao.guideMap({ stage, stageIndex: index, completed: state.completed.length, total: stages.length, travelling }), "map");
+  const stage = stages[index], chapterIndex = chapterIndexForStage(index), chapter = chapters[chapterIndex];
+  const fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id);
+  presentAgent(hebao.guideMap({
+    stage,
+    stageIndex: index,
+    completed: state.completed.length,
+    total: stages.length,
+    travelling,
+    rewardTitle: chapter.rewardTitle,
+    fragmentName: chapter.fragmentNames[fragmentPosition],
+    chapterCollected: chapterCompletedCount(chapterIndex),
+    chapterTotal: chapter.stageIds.length
+  }), "map");
 }
 function renderMap(studentIndex = reachedStageIndex()) {
   const chapter = chapters[activeChapterIndex], visibleIndices = chapterStageIndices(), nodes = $("stageNodes"); nodes.innerHTML = "";
+  const chapterCollected = chapterCompletedCount(activeChapterIndex);
   $("chapterMapTitle").textContent = chapter.title; $("chapterMapSubtitle").textContent = chapter.subtitle;
+  $("chapterRewardProgress").textContent = `${chapter.rewardTitle} · ${chapterCollected}/${chapter.stageIds.length}块`;
+  $("mapRepairTitle").textContent = chapter.rewardTitle;
+  $("mapRepairCount").textContent = `${chapterCollected} / ${chapter.stageIds.length}`;
+  $("mapRepairPercent").textContent = `修复程度 ${Math.round(chapterCollected / chapter.stageIds.length * 100)}%`;
+  $("mapRepairMeter").style.transform = `scaleX(${chapterCollected / chapter.stageIds.length})`;
+  renderChapterPuzzle($("mapPuzzle"), activeChapterIndex);
   $("mapWorld").style.backgroundImage = `url("${chapter.background}")`;
   renderChapterNav();
   visibleIndices.forEach(index => {
@@ -228,10 +374,15 @@ function renderMap(studentIndex = reachedStageIndex()) {
     button.className = `stage-node ${completed ? "completed" : unlocked ? "active" : "locked"}`;
     button.dataset.stageIndex = String(index);
     button.style.left = `${stage.x}%`; button.style.top = `${stage.y}%`;
-    button.setAttribute("aria-disabled", String(!unlocked)); button.setAttribute("aria-label", `${stage.title}，${completed ? "已修复" : unlocked ? "可进入" : "尚未解锁"}`);
+    button.setAttribute("aria-label", `${stage.title}，${completed ? "已修复，可回顾题目与校史" : unlocked ? "可进入" : "尚未解锁，点击听取荷宝提示"}`);
     const visual = stage.sprite ? `<img class="landmark-sprite" src="${stage.sprite}" alt="">` : `<span class="landmark-placeholder"><b>${stage.title}</b><small>建筑影像待补充</small></span>`;
     button.innerHTML = `${visual}<span class="pin"><b>${completed ? "✓" : unlocked ? index + 1 : "×"}</b></span><span class="node-label">${stage.title}</span>`;
-    button.addEventListener("click", event => { event.stopPropagation(); toggleStagePanel(index); }); nodes.appendChild(button);
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      if (!unlocked) { closeStagePanel(); notifyLockedRoute({ targetStage: stage, trigger: button }); return; }
+      toggleStagePanel(index);
+    });
+    nodes.appendChild(button);
   });
   const restored = state.completed.length, reached = reachedStageIndex(), reachedStage = stages[reached];
   $("restoredCount").textContent = restored; $("overallProgress").style.transform = `scaleX(${restored / stages.length})`;
@@ -244,15 +395,28 @@ function renderMap(studentIndex = reachedStageIndex()) {
 }
 function selectStage(index, focus = true, openPanel = true) {
   state.selected = index; const stage = stages[index], completed = state.completed.includes(stage.id), unlocked = isUnlocked(index);
+  const chapterIndex = chapterIndexForStage(index), chapter = chapters[chapterIndex], fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id);
   $("stageRoute").textContent = `记忆路线 · 第${index + 1}站`; $("stageTitle").textContent = stage.title; $("stageSubtitle").textContent = stage.subtitle; $("stageBrief").textContent = stage.brief;
-  $("stagePhoto").src = stage.photo; $("stagePhoto").alt = stage.caption; $("photoMask").style.opacity = completed ? 0 : 1; $("stageStatus").textContent = completed ? "影像已归档" : unlocked ? "等待修复" : "尚未解锁"; $("stageScore").textContent = completed ? "3 / 3 题" : "0 / 3 题";
-  $("startStage").disabled = !unlocked; $("startStage").textContent = completed ? "再次查阅档案" : unlocked ? "进入档案现场" : "完成上一地标后解锁";
+  $("stageRewardTitle").textContent = `本章目标 · ${chapter.rewardTitle}`;
+  renderChapterPuzzle($("stagePuzzle"), chapterIndex);
+  $("stageStatus").textContent = completed ? `已取得${chapter.fragmentNames[fragmentPosition]}碎片` : unlocked ? `完成后获得${chapter.fragmentNames[fragmentPosition]}碎片` : "尚未解锁"; $("stageScore").textContent = completed ? "已归档" : "0 / 3 题";
+  $("startStage").disabled = !unlocked; $("startStage").textContent = completed ? "回顾题目与校史" : unlocked ? "进入档案现场" : "完成上一地标后解锁";
   document.querySelectorAll(".stage-node").forEach(node => node.classList.toggle("selected", Number(node.dataset.stageIndex) === index));
   if (openPanel) { setMapAgentOpen(false); $("stagePanel").classList.add("open"); }
 }
 function closeStagePanel() { $("stagePanel").classList.remove("open"); }
 function toggleStagePanel(index) { if (state.selected === index && $("stagePanel").classList.contains("open")) { closeStagePanel(); return; } selectStage(index, false, true); }
-function startStage() { state.question = 0; state.correct = 0; state.chosen = null; state.answered = false; state.clueUsed = false; state.wrongStreak = 0; const s = stages[state.selected]; $("quizStageRoute").textContent = `第${state.selected + 1}站 · 影像修复`; $("quizStageTitle").textContent = s.title; $("quizPhoto").src = s.photo; $("quizPhoto").alt = s.caption; show("quizScreen"); renderQuestion(); }
+function startStage() {
+  if (!isUnlocked(state.selected)) { closeStagePanel(); notifyLockedRoute({ targetStage: stages[state.selected] }); return; }
+  const s = stages[state.selected];
+  state.question = 0; state.correct = 0; state.chosen = null; state.answered = false; state.clueUsed = false; state.wrongStreak = 0;
+  state.reviewMode = state.completed.includes(s.id);
+  $("quizScreen").classList.toggle("review-mode", state.reviewMode);
+  $("quizStageRoute").textContent = `第${state.selected + 1}站 · ${state.reviewMode ? "校史回顾" : "档案核验"}`;
+  $("quizStageTitle").textContent = s.title;
+  show("quizScreen");
+  renderQuestion();
+}
 function scheduleAgentNudge() {
   clearTimeout(agentNudgeTimer);
   agentNudgeTimer = setTimeout(() => {
@@ -263,31 +427,62 @@ function scheduleAgentNudge() {
   }, 9000);
 }
 function renderQuestion() {
+  if (state.reviewMode) { renderReviewQuestion(); return; }
   const stage = stages[state.selected], item = stage.questions[state.question]; state.chosen = null; state.answered = false; state.clueUsed = false;
   const assisted = state.wrongStreak >= 2;
   const introduction = hebao.introduceQuestion({ stage, question: item, questionIndex: state.question, wrongStreak: state.wrongStreak });
+  $("clueButton").hidden = false;
   $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`; $("questionText").textContent = item.text; $("difficulty").textContent = assisted ? "智能体辅助" : "基础"; $("submitAnswer").disabled = true; $("submitAnswer").textContent = "确认答案"; $("clueButton").disabled = false; $("feedback").hidden = true; presentAgent(introduction);
   const options = $("options"); options.innerHTML = ""; item.options.forEach((text, i) => { const b = document.createElement("button"); b.className = "option"; b.innerHTML = `<span class="option-key">${String.fromCharCode(65+i)}</span><span>${text}</span>`; b.addEventListener("click", () => chooseOption(i)); options.appendChild(b); });
   if (assisted) { const eliminated = item.options.findIndex((_, i) => i !== item.answer); const option = options.children[eliminated]; option.disabled = true; option.classList.add("eliminated"); option.setAttribute("aria-label", `${item.options[eliminated]}，已由荷宝排除`); }
-  document.querySelectorAll(".fragment-row span").forEach((span, i) => span.classList.toggle("restored", i < state.correct)); $("quizPhotoMask").style.opacity = `${Math.max(.12, 1 - state.correct * .3)}`;
   scheduleAgentNudge();
+}
+function renderReviewQuestion() {
+  clearTimeout(agentNudgeTimer);
+  const stage = stages[state.selected], item = stage.questions[state.question];
+  state.chosen = item.answer; state.answered = true; state.clueUsed = false;
+  $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`;
+  $("questionText").textContent = item.text;
+  $("difficulty").textContent = "校史回顾";
+  $("clueButton").hidden = true;
+  $("submitAnswer").disabled = false;
+  $("submitAnswer").textContent = state.question === stage.questions.length - 1 ? "结束回顾，返回地图" : "下一份档案";
+  const options = $("options"); options.innerHTML = "";
+  item.options.forEach((text, index) => {
+    const option = document.createElement("button");
+    option.className = `option review-option ${index === item.answer ? "correct" : ""}`;
+    option.disabled = true;
+    option.innerHTML = `<span class="option-key">${String.fromCharCode(65 + index)}</span><span>${text}</span>`;
+    options.appendChild(option);
+  });
+  $("feedback").hidden = false;
+  $("feedback").innerHTML = `<strong>归档答案：${String.fromCharCode(65 + item.answer)} · ${item.options[item.answer]}</strong><br>${item.explanation}`;
+  presentAgent({ speaker: "荷宝", text: `这处地标已经完成修复。现在不用重新作答，我们直接查看第${state.question + 1}份档案的答案与校史依据。`, citations: [{ label: stage.source }], meta: { intent: "review" } });
 }
 function chooseOption(index) { if (state.answered) return; state.chosen = index; [...$("options").children].forEach((el, i) => el.classList.toggle("selected", i === index)); $("submitAnswer").disabled = false; }
 function useClue() { if (state.answered) return; clearTimeout(agentNudgeTimer); const stage = stages[state.selected], item = stage.questions[state.question]; state.clueUsed = true; presentAgent(hebao.giveClue({ stage, question: item })); $("clueButton").disabled = true; $("clueButton").firstChild.textContent = "线索已调阅 "; }
 function submitAnswer() {
+  if (state.reviewMode) { nextReviewQuestion(); return; }
   if (state.chosen === null) return; if (state.answered) { nextQuestion(); return; }
   clearTimeout(agentNudgeTimer); state.answered = true; const item = stages[state.selected].questions[state.question], right = state.chosen === item.answer; if (right) { state.correct++; state.wrongStreak = 0; } else state.wrongStreak++;
   [...$("options").children].forEach((el, i) => { el.disabled = true; if (i === item.answer) el.classList.add("correct"); if (i === state.chosen && !right) el.classList.add("wrong"); });
   $("feedback").hidden = false; $("feedback").innerHTML = `<strong>${right ? "档案核验通过" : "这份记录需要重新辨认"}</strong><br>${item.explanation}`; $("submitAnswer").textContent = state.question === 2 ? "完成修复" : "下一份档案"; $("submitAnswer").disabled = false; $("clueButton").disabled = true;
   presentAgent(hebao.reviewAnswer({ stage: stages[state.selected], question: item, right, clueUsed: state.clueUsed, wrongStreak: state.wrongStreak }));
-  document.querySelectorAll(".fragment-row span").forEach((span, i) => span.classList.toggle("restored", i < state.correct)); $("quizPhotoMask").style.opacity = `${Math.max(.05, 1 - state.correct * .31)}`;
+}
+function nextReviewQuestion() {
+  const stage = stages[state.selected];
+  if (state.question < stage.questions.length - 1) { state.question++; renderReviewQuestion(); return; }
+  state.reviewMode = false;
+  $("quizScreen").classList.remove("review-mode");
+  activeChapterIndex = chapterIndexForStage(state.selected);
+  renderMap(); show("mapScreen"); moveCameraTo(state.selected); selectStage(state.selected, false, true);
+  presentAgent({ speaker: "荷宝", text: `${stage.title}的三份档案已经回顾完毕，原有通关记录和照片碎片保持不变。`, citations: [{ label: stage.source }], meta: { intent: "review-complete" } }, "map");
 }
 function nextQuestion() {
   if (state.question < 2) { state.question++; renderQuestion(); return; }
   if (state.correct < 2) {
     state.question = 0; state.correct = 0; renderQuestion();
-    presentAgent(hebao.reply("本轮只完成了部分核验。修复一张影像至少需要通过2份档案，我们带着刚才的解释再核对一次。", [], { intent: "retry" }));
-    $("evidencePrompt").textContent = "至少答对 2 题才能让影像完整显影。";
+    presentAgent(hebao.reply("本轮只完成了部分核验。取得照片碎片至少需要通过2份档案，我们带着刚才的解释再核对一次。", [], { intent: "retry" }));
     return;
   }
   finishStage();
@@ -295,8 +490,15 @@ function nextQuestion() {
 function finishStage() {
   clearTimeout(agentNudgeTimer);
   const stage = stages[state.selected]; if (!state.completed.includes(stage.id)) { state.completed.push(stage.id); localStorage.setItem("nankai-memory-progress", JSON.stringify(state.completed)); }
-  $("storyYear").textContent = stage.year; $("storyTitle").textContent = stage.storyTitle; $("storyText").textContent = stage.story; $("storySource").textContent = `资料来源：${stage.source}`; $("restoredPhoto").src = stage.photo; $("restoredPhoto").alt = stage.caption; $("restoredCaption").textContent = stage.caption;
-  const summary = hebao.summarizeStage({ stage, correct: state.correct });
+  const chapterIndex = chapterIndexForStage(state.selected), chapter = chapters[chapterIndex];
+  const fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id), chapterComplete = chapterCompletedCount(chapterIndex) === chapter.stageIds.length;
+  $("storyYear").textContent = stage.year; $("storyTitle").textContent = stage.storyTitle; $("storyText").textContent = stage.story; $("storySource").textContent = `资料来源：${stage.source}`;
+  $("rewardStatus").textContent = chapterComplete ? "章节影像完整显影" : "获得章节照片碎片";
+  renderChapterPuzzle($("rewardPuzzle"), chapterIndex, stage.id);
+  $("restoredCaption").textContent = chapter.rewardCaption;
+  $("fragmentEarned").textContent = chapterComplete ? `已集齐 ${chapter.stageIds.length} 块不规则碎片，“${chapter.rewardTitle}”完整归档。` : `新碎片 +1｜${stage.title}核验完成，寻回“${chapter.rewardTitle}”的${chapter.fragmentNames[fragmentPosition]}。`;
+  $("continueJourney").textContent = chapterComplete ? (state.selected === stages.length - 1 ? "收录完整影像，完成修复" : "收录完整影像，开启下一章") : "收好碎片，继续寻迹";
+  const summary = hebao.summarizeStage({ stage, correct: state.correct, chapterComplete, rewardTitle: chapter.rewardTitle, fragmentName: chapter.fragmentNames[fragmentPosition] });
   $("agentReview").textContent = `荷宝：${summary.text}`; show("storyScreen");
 }
 
@@ -317,10 +519,9 @@ function journeyToNextStage() {
   closeStagePanel();
   if (isFinal) { setStudentPosition(from); updateMapAgent(from); return; }
   if (changesChapter) {
-    $("mapWorld").classList.add("chapter-entering");
-    setStudentPosition(next, false); $("studentAvatar").hidden = false;
+    setStudentPosition(next, false);
     updateMapAgent(next);
-    setTimeout(() => $("mapWorld").classList.remove("chapter-entering"), 600);
+    showChapterIntro(nextChapterIndex);
     return;
   }
   updateMapAgent(next, true);
@@ -402,12 +603,13 @@ function enableMapAgentMovement() {
   });
 }
 
-$("enterGame").addEventListener("click", () => { state.selected = Math.min(state.completed.length, stages.length - 1); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); show("mapScreen"); setTimeout(() => moveCameraTo(state.selected), 80); });
+$("enterGame").addEventListener("click", () => { state.selected = Math.min(state.completed.length, stages.length - 1); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); showChapterIntro(activeChapterIndex); });
+$("enterChapter").addEventListener("click", enterActiveChapter);
 $("resetGame").addEventListener("click", () => { localStorage.removeItem("nankai-memory-progress"); state.completed = []; state.selected = 0; activeChapterIndex = 0; renderMap(); });
-$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); show("mapScreen"); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
+$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); show("mapScreen"); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
 $("closeStagePanel").addEventListener("click", closeStagePanel);
 $("mapViewport").addEventListener("click", event => { if (!event.target.closest(".stage-node")) closeStagePanel(); });
 enableMapMovement();
 enableMapAgentMovement();
 
-document.addEventListener("keydown", (event) => { if (!$("quizScreen").hidden && !state.answered && /^[1-4]$/.test(event.key)) chooseOption(Number(event.key) - 1); });
+document.addEventListener("keydown", (event) => { if (!$("quizScreen").hidden && !state.reviewMode && !state.answered && /^[1-4]$/.test(event.key)) chooseOption(Number(event.key) - 1); });

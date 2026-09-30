@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#2a0d3d">
   <title>南开记忆修复计划</title>
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
   <a class="skip-link" href="#game">跳到游戏内容</a>
@@ -24,9 +24,24 @@
       </div>
       <div class="intro-file" aria-label="任务档案摘要">
         <span>档案编号 NK-1919</span>
-        <strong>散佚影像：14</strong>
+        <strong>散佚影像：3 · 碎片：14</strong>
         <span>修复员：待登记</span>
       </div>
+    </section>
+
+    <section id="chapterIntro" class="screen chapter-intro" hidden aria-labelledby="chapterIntroTitle">
+      <div class="chapter-intro-backdrop" aria-hidden="true"></div>
+      <div class="curtain curtain-left" aria-hidden="true"><i></i></div>
+      <div class="curtain curtain-right" aria-hidden="true"><i></i></div>
+      <article class="chapter-intro-copy">
+        <p id="chapterIntroPeriod" class="chapter-intro-period"></p>
+        <h1 id="chapterIntroTitle"></h1>
+        <p id="chapterIntroText" class="chapter-intro-text"></p>
+        <div id="chapterIntroHighlights" class="chapter-intro-highlights" aria-label="本章校史关键词"></div>
+        <p id="chapterIntroQuote" class="chapter-intro-quote"></p>
+        <button id="enterChapter" class="primary-button">进入本章地图</button>
+      </article>
+      <p class="chapter-intro-caption">南开记忆修复计划 · 章节序幕</p>
     </section>
 
     <section id="mapScreen" class="screen map-screen" hidden>
@@ -37,7 +52,7 @@
         </div>
         <nav id="chapterNav" class="chapter-nav" aria-label="校史年代章节"></nav>
         <div class="header-progress" aria-label="总体修复进度">
-          <span>已修复</span>
+          <span>已收集碎片</span>
           <strong><b id="restoredCount">0</b> / 14</strong>
           <div class="progress-track"><i id="overallProgress"></i></div>
         </div>
@@ -46,7 +61,16 @@
       <div class="map-layout">
         <section id="mapViewport" class="campus-map" aria-label="可横向移动的南开记忆路线图，不代表真实地理比例" tabindex="0">
           <div id="mapWorld" class="map-world">
-            <div class="map-caption"><span id="chapterMapTitle">1919—1948</span><small id="chapterMapSubtitle">私立南开、战火南迁与复校</small></div>
+            <div class="map-caption"><span id="chapterMapTitle">1919—1948</span><small id="chapterMapSubtitle">私立南开、战火南迁与复校</small><em id="chapterRewardProgress">开学典礼照片 · 0/5块</em></div>
+            <aside class="map-restoration" aria-labelledby="mapRepairTitle">
+              <div class="map-restoration-heading">
+                <div><small>本章影像修复</small><strong id="mapRepairTitle">南开大学开学典礼照片</strong></div>
+                <b id="mapRepairCount">0 / 5</b>
+              </div>
+              <div id="mapPuzzle" class="chapter-puzzle map-puzzle" aria-label="本章照片修复进度"></div>
+              <div class="repair-meter" aria-hidden="true"><i id="mapRepairMeter"></i></div>
+              <p id="mapRepairPercent">修复程度 0%</p>
+            </aside>
             <div id="stageNodes"></div>
             <div id="studentAvatar" class="student-avatar" aria-label="校史记忆修复员，目前位于校钟">
               <img src="assets/student-restorer.png" alt="身穿南开紫外套、携带档案包的学生修复员">
@@ -74,10 +98,8 @@
           <p id="stageRoute" class="stage-route">记忆路线 · 第一站</p>
           <h2 id="stageTitle">校钟</h2>
           <p id="stageSubtitle" class="stage-subtitle"></p>
-          <div class="photo-frame">
-            <img id="stagePhoto" src="assets/archive-opening.jpg" alt="本关待修复档案影像">
-            <div id="photoMask" class="photo-mask" aria-hidden="true"></div>
-          </div>
+          <p id="stageRewardTitle" class="stage-reward-title">本章目标 · 开学典礼照片</p>
+          <div id="stagePuzzle" class="chapter-puzzle compact" aria-label="本章照片碎片收集进度"></div>
           <div class="stage-meta">
             <span id="stageStatus">等待修复</span>
             <span id="stageScore">0 / 3 题</span>
@@ -96,12 +118,6 @@
         <div id="questionCounter" class="question-counter">1 / 3</div>
       </header>
       <div class="quiz-layout">
-        <aside class="evidence-desk parchment">
-          <p class="folio-label">待修复影像</p>
-          <div class="quiz-photo"><img id="quizPhoto" src="assets/archive-opening.jpg" alt="待修复照片"><div id="quizPhotoMask" class="photo-mask"></div></div>
-          <div class="fragment-row"><span></span><span></span><span></span></div>
-          <p id="evidencePrompt">每答对一题，一块影像碎片会重新显影。</p>
-        </aside>
         <article class="question-card parchment">
           <div class="question-heading"><span id="questionType">档案辨识</span><span id="difficulty">基础</span></div>
           <h2 id="questionText"></h2>
@@ -130,15 +146,16 @@
         </div>
       </div>
       <aside class="restored-photo parchment">
-        <p>影像修复完成</p>
-        <img id="restoredPhoto" src="assets/archive-opening.jpg" alt="已修复的校史影像">
+        <p id="rewardStatus">获得章节照片碎片</p>
+        <div id="rewardPuzzle" class="chapter-puzzle reward" aria-label="本章照片碎片奖励"></div>
         <h2 id="restoredCaption"></h2>
+        <p id="fragmentEarned" class="fragment-earned"></p>
         <p id="agentReview"></p>
         <button id="continueJourney" class="primary-button">收录影像，继续寻迹</button>
       </aside>
     </section>
   </main>
-  <script src="hebao-client.js?v=1"></script>
-  <script src="game.js?v=10"></script>
+  <script src="hebao-client.js?v=2"></script>
+  <script src="game.js?v=15"></script>
 </body>
 </html>
