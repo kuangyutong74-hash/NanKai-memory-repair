@@ -111,6 +111,7 @@ class HebaoAgent:
             if context.get("targetType") == "chapter":
                 text = (
                     f"“{target_chapter.get('title', '后续章节')}”还没有解锁。"
+                    f"你可以先查看这张地图和地标样式，但暂时不能进入关卡体验。"
                     f"请先完成“{prerequisite.get('title', '当前章节最后一站')}”的影像修复，"
                     f"现在应继续前往“{next_stage.get('title', '当前地标')}”。"
                 )

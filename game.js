@@ -130,6 +130,86 @@ stageCatalog.push(
   eraStage("yifu", "逸夫馆", "renewal", "从知识空间进入开放发展的新时期", "assets/landmark-yifu.png")
 );
 
+// 题目统一取自《南开记忆修复计划_题库.md》中的同名地标题池。
+// 每个地标固定抽取 3 题，以符合“3 份档案核验”的关卡规则；题库不足 3 题的
+// 新开湖和爱国三问碑，分别用题库中与该地标直接相关的题目补足。
+const landmarkQuestions = {
+  bell: [
+    q("现在的南开校钟高1.937米，这个数字暗含哪一年的国难记忆？", ["1919年", "1997年", "1937年", "1946年"], 2, "1997年为纪念南开被炸60周年重铸新钟，钟高1.937米，对应1937年7月日军炸毁南开；钟身还刻有60枚校徽图案。", "把小数点去掉，联想南开校园遭日军轰炸的年份。"),
+    q("每年7月29日“校殇日”，师生校友在校钟前先鸣钟7响，再鸣多少响？", ["28响", "14响", "29响", "37响"], 0, "7响加28响，寓意铭记7月28日深夜至29日的南开校殇。", "前后两组钟声共同组成一个七月日期。"),
+    q("1937年被日军毁掠的老校钟，钟面铸的是校歌与校训。", ["正确", "错误"], 1, "老钟钟面铸的是整部《金刚经》，重约一万三千余斤；校歌、校训是1997年新钟四面所铸。", "注意区分1937年的老钟与1997年重铸的新钟。")
+  ],
+  mati: [
+    q("1979年南开建校60周年时，马蹄湖湖心岛上树立的纪念物是？", ["周总理纪念碑", "西南联大纪念碑", "张伯苓铜像", "周恩来总理塑像"], 0, "碑文由杨石先校长撰写，每年清明校友会在两侧松柏上系白花。主楼南广场的总理塑像要到1989年才立。", "它位于湖心岛，且是碑而不是塑像。"),
+    q("1923年南开迁入八里台校区时，马蹄湖已经存在。", ["正确", "错误"], 0, "马蹄湖分南北两片，早在1923年就已存在；1937年同样遭日军轰炸破坏。", "马蹄湖不是新中国成立后才人工开挖的。"),
+    q("1950年从海外归国任教的化学家王积涛，冬天常在结冰的马蹄湖上做什么？", ["滑冰", "赏荷", "垂钓", "写生"], 0, "马蹄湖不只见证历史，也是南开人的日常生活场景。", "题干强调了冬天与结冰。")
+  ],
+  xiushan: [
+    q("“秀山堂”的“秀山”是捐资者的字，他是谁？", ["严修", "李纯", "袁述之", "卢靖"], 1, "江苏督军李纯（字秀山）捐资，秀山堂于1923年建成。", "卢靖号木斋，袁述之则参与捐建思源堂。"),
+    q("秀山堂建成之初，行政办公室、大礼堂和文商科教室都设在这里。", ["正确", "错误"], 0, "秀山堂既是行政中心，也是文商学院所在；1923年6月的第一次毕业式也在此举行。", "它在早期校园中承担多种教学与行政功能。"),
+    q("1934年日本兴亚学徒联盟来津参观，与南开学生在秀山堂论战。事后整理的《中日学生会谈纪实》发表在哪家报纸？", ["《新民报》", "《申报》", "《大公报》", "《晨报》"], 2, "南开学生在论战中痛斥日本军国主义侵略行径，此事被整理成文发表于《大公报》。", "这份报纸创办于天津。")
+  ],
+  siyuan: [
+    q("“思源堂”取“饮水思源”之意，纪念的是哪两方的捐助？", ["美国洛克菲勒基金会和河南实业家袁述之", "香港实业家邵逸夫和国家教委", "藏书家卢靖和江苏督军李纯", "校友周海冰和侯莹"], 0, "思源堂由美国洛克菲勒基金会和河南实业家袁述之共同出资捐建。", "其他三组选项分别对应逸夫馆、木斋图书馆与秀山堂、海冰楼。"),
+    q("思源堂最初的用途是？", ["学生饭厅", "科学馆（供理工系科使用）", "图书馆", "大礼堂"], 1, "思源堂1923年始建、1925年落成，最初作为科学馆供理工系科使用。", "它与南开早期理工教育直接相关。"),
+    q("下列哪位后来的世界级数学家，曾在思源堂求学？", ["曹禺", "陈省身", "杨石先", "叶嘉莹"], 1, "陈省身1930年毕业于南开数学系，师从姜立夫，被誉为“微分几何之父”。", "他以微分几何研究闻名世界。")
+  ],
+  library: [
+    q("木斋图书馆由谁捐银元10万兴建？", ["严修", "卢靖", "李纯", "邵逸夫"], 1, "卢靖字勉之、号木斋，是近代教育家、藏书家。", "馆名取自捐资者的号。"),
+    q("木斋图书馆里的“东北研究会”为何让侵华日军恨之入骨？", ["组织学生赴日留学", "翻译日本文学名著", "搜集了大量日本侵略东北的罪行证据", "展出日本文物精品"], 2, "东北研究会搜集了大量日本侵略东北的罪行证据，日军因此视南开为“排日之根据地”。", "它保存的是与侵略罪行有关的证据。"),
+    q("木斋图书馆馆内可容纳的图书规模约为？", ["5万册", "20余万册", "70万册", "100万册"], 1, "木斋图书馆可容纳20余万册图书；70万册是后来冯文潜任馆长期间的馆藏规模。", "不要把建筑设计容量与1952年后的馆藏量混淆。")
+  ],
+  xinkai: [
+    q("1958年建成的文中馆（当时的图书馆）坐落在哪个湖畔？", ["新开湖", "大明湖", "未名湖", "马蹄湖"], 0, "新开湖畔的文中馆共五层，建筑面积8256平方米。", "题目所问湖泊与本关地标同名。"),
+    q("海冰楼夹在马蹄湖与哪个湖之间？", ["未名湖", "新开湖", "玄武湖", "大明湖"], 1, "海冰楼位于马蹄湖、新开湖之间。", "它是八里台校区两片湖面之间的建筑。"),
+    q("1958年建成、最初作为五层图书馆使用的建筑是？", ["文中馆", "逸夫馆", "木斋图书馆", "津南中心馆"], 0, "文中馆建于新开湖畔，最初是五层图书馆，后来转为理科图书馆。", "这座建筑坐落在新开湖畔。")
+  ],
+  haibing: [
+    q("海冰楼建成之初（1952年）的主要用途是？", ["科学馆", "学生饭厅，兼作大礼堂", "体育馆", "图书馆"], 1, "海冰楼建成之初以学生饭厅为主，兼作大礼堂。", "这里既能吃饭，也能临时布置座椅召开大会。"),
+    q("1959年周恩来总理第三次重返母校视察，在食堂买了什么饭菜？", ["萝卜、咸菜和窝窝头", "饺子和汤", "包子和豆浆", "红烧肉和米饭"], 0, "周恩来买了萝卜、咸菜和两个窝窝头，饭后还与炊事员一一握手道谢。", "这是一顿十分朴素的饭菜。"),
+    q("2016年捐资改造、2018年完工后命名“海冰楼”的校友是？", ["张文忠与卢靖", "邵逸夫与李纯", "周海冰与侯莹", "杨石先与姜立夫"], 2, "周海冰、侯莹捐资改造，楼内还设有“侯莹厅”。", "楼名取自其中一位捐赠者的名字。")
+  ],
+  wenzhong: [
+    q("1989年逸夫图书馆建成后，文中馆转作什么？", ["校史馆", "行政办公楼", "学生宿舍", "理科图书馆"], 3, "逸夫图书馆建成后，文中馆转为理科图书馆使用。", "它仍然保留图书馆功能，但服务对象更集中。"),
+    q("2018年9月，为纪念哪位校友的捐赠，理科图书馆被命名为“文中馆”？", ["周海冰", "张文忠", "邵逸夫", "陈省身"], 1, "“文中馆”之名来自校友张文忠的捐赠。", "馆名取自这位校友名字中的两个字。"),
+    q("1952—1963年任图书馆馆长的冯文潜，任内馆藏从20万册增至多少？", ["100万册", "70万册", "40万册", "150万册"], 1, "冯文潜任内，南开图书馆馆藏从20万册增至70万册。", "答案介于40万与100万之间。")
+  ],
+  main: [
+    q("南开主楼建成于哪一年？", ["1989年", "1952年", "1962年", "1958年"], 2, "主楼1962年建成，采用仿苏联式建筑风格，沿中轴对称。", "年份在文中馆建成之后四年。"),
+    q("主楼东西横踞151.6米，顶高约多少米？", ["65.5米", "45.5米", "35.5米", "55.5米"], 3, "主楼顶高约55.5米，建筑面积18202平方米。", "三个数字相同。"),
+    q("1977年恢复高考后到90年代中期，历届毕业生的毕业典礼多在主楼哪里举行？", ["露天操场", "教工食堂", "图书馆阅览室", "附设小礼堂（可容400人）"], 3, "主楼附设小礼堂可容400人，一度是毕业典礼的固定场所。", "场地位于主楼内部并可容纳数百人。")
+  ],
+  zhou: [
+    q("主楼南广场的周恩来总理塑像，树立于南开建校多少周年校庆之际？", ["70周年", "80周年", "100周年", "60周年"], 0, "塑像于1989年10月17日落成，正值南开建校70周年。", "由1919年推算到1989年。"),
+    q("马蹄湖的周总理纪念碑与主楼南广场的周恩来总理塑像，是同一时期、同一地点的纪念物。", ["正确", "错误"], 1, "纪念碑1979年立于马蹄湖湖心岛；塑像1989年立于主楼南广场。", "两者相差十年，形制也不同。"),
+    q("主楼前周恩来总理汉白玉塑像的设计者是哪位雕塑家？", ["吴为山", "傅天仇", "刘开渠", "钱绍武"], 1, "塑像由雕塑家傅天仇设计，是他的最后作品。", "这位雕塑家的名字中含有“天”字。")
+  ],
+  lianda: [
+    q("西南联大纪念碑原碑1946年落成在哪座城市？", ["重庆", "天津", "昆明", "长沙"], 2, "原碑立于昆明西南联大旧址，即今云南师范大学。", "西南联大最终办学所在的城市。"),
+    q("西南联大纪念碑的碑文由谁撰写？", ["罗庸", "张伯苓", "闻一多", "冯友兰"], 3, "纪念碑由冯友兰撰文、闻一多篆额、罗庸书丹，被称为“三绝碑”。", "闻一多负责篆额，罗庸负责书丹。"),
+    q("西南联大纪念碑碑阴镌刻着抗战以来从军学生的题名。", ["正确", "错误"], 0, "碑阴列有834个题名，其中两人各出现两次，实际为832人。", "碑的背面记录了投笔从戎的学生。")
+  ],
+  yifu: [
+    q("逸夫馆由哪位香港实业家捐资兴建？", ["邵逸夫", "张文忠", "李纯", "卢靖"], 0, "邵逸夫捐资1000万港币，国家教委另投300万人民币，逸夫馆于1990年5月启用。", "馆名直接来自捐资者。"),
+    q("逸夫馆馆舍面积约多少平方米？", ["3600", "8256", "46500", "11150"], 3, "逸夫馆馆舍面积约11150平方米。", "3600平方米对应木斋图书馆，8256平方米对应文中馆。"),
+    q("2020年10月修缮重开后，逸夫馆阅览座位由300余席增至900余席。", ["正确", "错误"], 0, "修缮后阅览座位增至900余席，并新增16个单人学习间、4个多人研讨室。", "修缮显著增加了学习座位。")
+  ],
+  today: [
+    q("津南校区于哪一年启用？", ["2013年", "2019年", "2015年", "2017年"], 2, "津南中心馆2013年6月奠基，2015年随津南校区投入使用。", "它早于百年校庆四年。"),
+    q("以津南中心馆为主的建筑群荣获了什么奖项？", ["梁思成建筑奖", "中国建设工程鲁班奖（2016—2017年度）", "詹天佑奖", "普利兹克奖"], 1, "以津南中心馆为主的建筑群荣获2016—2017年度中国建设工程鲁班奖。", "这是中国建筑工程质量领域的重要奖项。"),
+    q("津南中心馆的设计延续了老校区建筑群的什么布局？", ["回字形", "十字形", "丁字形", "品字形"], 3, "津南中心馆延续老校区建筑群的“品字形”布局，并融入新时代建筑元素。", "三个主体的组合像一个汉字。")
+  ],
+  three: [
+    q("1935年张伯苓在开学典礼上提出“爱国三问”，第一问是什么？", ["你愿意中国好吗？", "你是中国人吗？", "你爱中国吗？", "你愿意为中国奋斗吗？"], 1, "爱国三问依次是：你是中国人吗？你爱中国吗？你愿意中国好吗？", "三问从身份认同开始。"),
+    q("“爱国三问”提出于哪一年？", ["1935年", "1946年", "1919年", "1937年"], 0, "1935年日本侵华加剧、华北局势紧张，张伯苓提出爱国三问。", "它提出于南开校园被炸毁前两年。"),
+    q("“爱国三问”的提出者是？", ["周恩来", "梅贻琦", "张伯苓", "严修"], 2, "爱国三问由南开大学首任校长张伯苓提出。", "他也是南开大学首任校长。")
+  ]
+};
+
+stageCatalog.forEach((stage) => {
+  if (landmarkQuestions[stage.id]) stage.questions = landmarkQuestions[stage.id];
+});
+
 const chapters = [
   {
     id: "origin", title: "1919—1948", subtitle: "私立南开、战火南迁与复校", background: "assets/campus-empty-origin-v2.png", stageIds: ["bell", "mati", "xiushan", "siyuan", "library"],
@@ -202,7 +282,15 @@ chapters.forEach(chapter => chapter.stageIds.forEach((id, index) => {
 
 function q(text, options, answer, explanation, clue) { return { text, options, answer, explanation, clue }; }
 
-const state = { completed: JSON.parse(localStorage.getItem("nankai-memory-progress") || "[]"), selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0, reviewMode: false };
+const safeStorage = {
+  get(key, fallback = null) { try { return window.localStorage?.getItem(key) ?? fallback; } catch { return fallback; } },
+  set(key, value) { try { window.localStorage?.setItem(key, value); } catch { /* 无持久存储时保留本轮内存进度 */ } },
+  remove(key) { try { window.localStorage?.removeItem(key); } catch { /* 无持久存储时无需清理 */ } }
+};
+let savedProgress = [];
+try { savedProgress = JSON.parse(safeStorage.get("nankai-memory-progress", "[]")); } catch { safeStorage.remove("nankai-memory-progress"); }
+if (!Array.isArray(savedProgress)) savedProgress = [];
+const state = { completed: savedProgress, selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0, reviewMode: false, timelineOrder: [], answerHistory: [] };
 const $ = (id) => document.getElementById(id);
 const hebao = new HebaoClient({ endpoint: window.HEBAO_CONFIG?.endpoint || "/api/agent/event", onReply: presentAgent });
 let agentNudgeTimer = null;
@@ -296,7 +384,12 @@ function isChapterUnlocked(chapterIndex) {
 }
 function notifyLockedRoute({ targetStage = null, targetChapter = null, trigger = null }) {
   const targetIndex = targetStage ? stages.indexOf(targetStage) : chapterStageIndices(chapters.indexOf(targetChapter))[0];
-  const prerequisite = stages[Math.max(0, targetIndex - 1)];
+  let prerequisite = stages[Math.max(0, targetIndex - 1)];
+  if (targetChapter) {
+    const targetChapterIndex = chapters.indexOf(targetChapter);
+    const blockingChapter = chapters.find((chapter, index) => index < targetChapterIndex && chapter.stageIds.some(id => !state.completed.includes(id)));
+    if (blockingChapter) prerequisite = catalogById[blockingChapter.stageIds.at(-1)];
+  }
   const nextStage = stages[reachedStageIndex()];
   const reply = hebao.guardRoute({
     targetType: targetChapter ? "chapter" : "stage",
@@ -320,13 +413,17 @@ function renderChapterNav() {
     const unlocked = isChapterUnlocked(index);
     button.className = `chapter-tab ${index === activeChapterIndex ? "active" : ""} ${unlocked ? "" : "locked"}`;
     button.setAttribute("aria-current", index === activeChapterIndex ? "page" : "false");
-    button.setAttribute("aria-label", `${chapter.title}，${unlocked ? `${completed}/${chapterIndices.length}块碎片已收集` : "尚未解锁，点击听取荷宝提示"}`);
-    button.innerHTML = `<strong>${chapter.title}</strong><span>${unlocked ? `${completed}/${chapterIndices.length}` : "尚未解锁"}</span>`;
+    button.setAttribute("aria-label", `${chapter.title}，${unlocked ? `${completed}/${chapterIndices.length}块碎片已收集` : "尚未解锁，可以预览地图，不能进入关卡"}`);
+    button.innerHTML = `<strong>${chapter.title}</strong><span>${unlocked ? `${completed}/${chapterIndices.length}` : "地图预览"}</span>`;
     button.addEventListener("click", () => {
-      if (!unlocked) { notifyLockedRoute({ targetChapter: chapter, trigger: button }); return; }
       activeChapterIndex = index;
       state.selected = chapterIndices.includes(state.selected) ? state.selected : chapterIndices[0];
-      closeStagePanel(); showChapterIntro(index);
+      closeStagePanel();
+      if (unlocked) { showChapterIntro(index); return; }
+      renderMap();
+      show("mapScreen");
+      setTimeout(() => moveCameraTo(state.selected), 80);
+      notifyLockedRoute({ targetChapter: chapter, trigger: document.querySelector(`.chapter-tab:nth-child(${index + 1})`) });
     });
     nav.appendChild(button);
   });
@@ -357,6 +454,7 @@ function updateMapAgent(index, travelling = false) {
 }
 function renderMap(studentIndex = reachedStageIndex()) {
   const chapter = chapters[activeChapterIndex], visibleIndices = chapterStageIndices(), nodes = $("stageNodes"); nodes.innerHTML = "";
+  const chapterUnlocked = isChapterUnlocked(activeChapterIndex);
   const chapterCollected = chapterCompletedCount(activeChapterIndex);
   $("chapterMapTitle").textContent = chapter.title; $("chapterMapSubtitle").textContent = chapter.subtitle;
   $("chapterRewardProgress").textContent = `${chapter.rewardTitle} · ${chapterCollected}/${chapter.stageIds.length}块`;
@@ -364,6 +462,12 @@ function renderMap(studentIndex = reachedStageIndex()) {
   $("mapRepairCount").textContent = `${chapterCollected} / ${chapter.stageIds.length}`;
   $("mapRepairPercent").textContent = `修复程度 ${Math.round(chapterCollected / chapter.stageIds.length * 100)}%`;
   $("mapRepairMeter").style.transform = `scaleX(${chapterCollected / chapter.stageIds.length})`;
+  $("mapHud").textContent = chapterUnlocked
+    ? "点击已抵达的建筑进入关卡 · 完成修复后前往下一站"
+    : "地图预览模式 · 可查看地标样式，完成前置章节后方可体验";
+  $("mapViewport").setAttribute("aria-label", chapterUnlocked
+    ? "可移动的南开记忆路线图，不代表真实地理比例"
+    : `${chapter.title}章节地图预览，关卡尚未解锁`);
   renderChapterPuzzle($("mapPuzzle"), activeChapterIndex);
   $("mapWorld").style.backgroundImage = `url("${chapter.background}")`;
   renderChapterNav();
@@ -389,7 +493,7 @@ function renderMap(studentIndex = reachedStageIndex()) {
   const studentInChapter = stages[studentIndex]?.chapterId === chapter.id;
   $("studentAvatar").hidden = !studentInChapter;
   if (studentInChapter) setStudentPosition(studentIndex, false);
-  updateMapAgent(studentInChapter ? reached : visibleIndices[0]);
+  if (chapterUnlocked) updateMapAgent(studentInChapter ? reached : visibleIndices[0]);
   if (!visibleIndices.includes(state.selected)) state.selected = visibleIndices[0];
   selectStage(state.selected, false, false);
 }
@@ -409,7 +513,7 @@ function toggleStagePanel(index) { if (state.selected === index && $("stagePanel
 function startStage() {
   if (!isUnlocked(state.selected)) { closeStagePanel(); notifyLockedRoute({ targetStage: stages[state.selected] }); return; }
   const s = stages[state.selected];
-  state.question = 0; state.correct = 0; state.chosen = null; state.answered = false; state.clueUsed = false; state.wrongStreak = 0;
+  state.question = 0; state.correct = 0; state.chosen = null; state.answered = false; state.clueUsed = false; state.wrongStreak = 0; state.answerHistory = [];
   state.reviewMode = state.completed.includes(s.id);
   $("quizScreen").classList.toggle("review-mode", state.reviewMode);
   $("quizStageRoute").textContent = `第${state.selected + 1}站 · ${state.reviewMode ? "校史回顾" : "档案核验"}`;
@@ -432,10 +536,133 @@ function renderQuestion() {
   const assisted = state.wrongStreak >= 2;
   const introduction = hebao.introduceQuestion({ stage, question: item, questionIndex: state.question, wrongStreak: state.wrongStreak });
   $("clueButton").hidden = false;
-  $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`; $("questionText").textContent = item.text; $("difficulty").textContent = assisted ? "智能体辅助" : "基础"; $("submitAnswer").disabled = true; $("submitAnswer").textContent = "确认答案"; $("clueButton").disabled = false; $("feedback").hidden = true; presentAgent(introduction);
-  const options = $("options"); options.innerHTML = ""; item.options.forEach((text, i) => { const b = document.createElement("button"); b.className = "option"; b.innerHTML = `<span class="option-key">${String.fromCharCode(65+i)}</span><span>${text}</span>`; b.addEventListener("click", () => chooseOption(i)); options.appendChild(b); });
-  if (assisted) { const eliminated = item.options.findIndex((_, i) => i !== item.answer); const option = options.children[eliminated]; option.disabled = true; option.classList.add("eliminated"); option.setAttribute("aria-label", `${item.options[eliminated]}，已由荷宝排除`); }
+  $("previousQuestion").hidden = state.question === 0 || !state.answerHistory[state.question - 1];
+  $("previousReview").hidden = true;
+  $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`; $("difficulty").textContent = assisted ? "智能体辅助" : "基础"; $("submitAnswer").disabled = true; $("submitAnswer").textContent = "确认核验"; $("clueButton").disabled = false; $("feedback").className = "feedback"; $("feedback").hidden = true; presentAgent(introduction);
+  $("options").innerHTML = "";
+  if (state.question === 0) renderWalkChoice(item, assisted);
+  else if (state.question === 1) renderEvidenceJudgement(item);
+  else renderTimelineSort(stage);
   scheduleAgentNudge();
+}
+
+function renderWalkChoice(item, assisted) {
+  $("questionType").textContent = "走近核验";
+  $("questionText").textContent = item.text;
+  const area = $("gameplayArea");
+  area.className = "gameplay-area choice-arena";
+  area.innerHTML = `<div class="arena-vignette"></div><img class="arena-player" src="assets/student-restorer.png" alt="校史记忆修复员"><div class="choice-lecterns" role="radiogroup" aria-label="档案选项"></div><p class="arena-instruction">点击档案台走近核验 · 键盘可按 1—4</p>`;
+  const lecterns = area.querySelector(".choice-lecterns");
+  item.options.forEach((text, index) => {
+    const button = document.createElement("button");
+    button.className = "archive-lectern";
+    button.innerHTML = `<span class="lectern-key">${String.fromCharCode(65 + index)}</span><span>${text}</span>`;
+    button.addEventListener("click", () => chooseWalkOption(index));
+    lecterns.appendChild(button);
+  });
+  if (assisted) {
+    const eliminated = item.options.findIndex((_, index) => index !== item.answer);
+    lecterns.children[eliminated].disabled = true;
+    lecterns.children[eliminated].classList.add("eliminated");
+  }
+}
+
+function chooseWalkOption(index) {
+  if (state.answered) return;
+  state.chosen = index;
+  const area = $("gameplayArea"), buttons = [...area.querySelectorAll(".archive-lectern")];
+  buttons.forEach((button, i) => button.classList.toggle("selected", i === index));
+  area.dataset.position = String(index);
+  $("submitAnswer").disabled = false;
+}
+
+function evidenceClaim(item) {
+  const truth = state.selected % 2 === 0;
+  const claimIndex = truth ? item.answer : item.options.findIndex((_, index) => index !== item.answer);
+  return { truth, text: item.options[claimIndex] };
+}
+
+function renderEvidenceJudgement(item) {
+  $("questionType").textContent = "证据称量";
+  const claim = evidenceClaim(item);
+  $("questionText").textContent = `待核验陈述：${claim.text}`;
+  const area = $("gameplayArea");
+  area.className = "gameplay-area evidence-lab";
+  area.innerHTML = `<div class="claim-slip"><small>待核验陈述</small><strong>${claim.text}</strong></div><div class="scale-dropzone" aria-label="证据称量盘"></div><div class="evidence-deck"></div><div class="judgement-actions"><button data-verdict="support">证据支持</button><button data-verdict="refute">证据反驳</button></div><p class="arena-instruction">先将至少两份证据放上天平，再作判断</p>`;
+  const evidence = [
+    ["照片", stages[state.selected].photo, `查看${stages[state.selected].title}影像中的年代与场景`],
+    ["年表", "", stages[state.selected].year],
+    ["文献", "", item.explanation]
+  ];
+  const deck = area.querySelector(".evidence-deck");
+  evidence.forEach(([label, image, text], index) => {
+    const card = document.createElement("button");
+    card.className = "evidence-card";
+    card.innerHTML = `${image ? `<img src="${image}" alt="">` : `<span class="evidence-mark">${index === 1 ? "年" : "卷"}</span>`}<span><b>${label}</b><small>${text}</small></span>`;
+    card.addEventListener("click", () => { if (state.answered) return; card.classList.toggle("weighed"); updateEvidenceReady(); });
+    deck.appendChild(card);
+  });
+  area.querySelectorAll("[data-verdict]").forEach(button => button.addEventListener("click", () => {
+    if (area.querySelectorAll(".evidence-card.weighed").length < 2 || state.answered) return;
+    state.chosen = button.dataset.verdict;
+    area.querySelectorAll("[data-verdict]").forEach(itemButton => itemButton.classList.toggle("selected", itemButton === button));
+    $("submitAnswer").disabled = false;
+  }));
+}
+
+function updateEvidenceReady() {
+  const area = $("gameplayArea"), count = area.querySelectorAll(".evidence-card.weighed").length;
+  area.classList.toggle("scale-ready", count >= 2);
+  area.querySelector(".arena-instruction").textContent = count >= 2 ? "证据已上秤，请作出支持或反驳判断" : `还需放入 ${2 - count} 份证据`;
+}
+
+function timelineRecords() {
+  const total = stages.length, start = Math.max(0, Math.min(state.selected - 1, total - 4));
+  return stages.slice(start, start + 4).map(stage => ({ id: stage.id, title: stage.title, year: parseInt(stage.year, 10) || 9999 }));
+}
+
+function renderTimelineSort(stage) {
+  $("questionType").textContent = "推箱归档";
+  $("questionText").textContent = "将四份地标档案按最早出现的年份，从左到右送入时间线。";
+  const records = timelineRecords();
+  state.timelineOrder = [...records].sort((a, b) => a.year - b.year).map(record => record.id);
+  const mixed = [...records].reverse();
+  const area = $("gameplayArea");
+  area.className = "gameplay-area timeline-room";
+  area.innerHTML = `<div class="timeline-rail" aria-label="归档时间线"></div><div class="crate-yard" aria-label="待归档事件箱"></div><img class="timeline-player" src="assets/student-restorer.png" alt="校史记忆修复员"><p class="arena-instruction">拖动档案箱交换位置 · 按年代从早到晚排列</p>`;
+  const rail = area.querySelector(".timeline-rail"), yard = area.querySelector(".crate-yard");
+  mixed.forEach((record, index) => {
+    const slot = document.createElement("div"); slot.className = "timeline-slot"; slot.innerHTML = `<small>档案位 ${index + 1}</small><b>待归档</b>`; rail.appendChild(slot);
+    const crate = document.createElement("button"); crate.className = "archive-crate"; crate.draggable = true; crate.dataset.id = record.id; crate.innerHTML = `<span class="crate-seal">${String(index + 1).padStart(2, "0")}</span><b>${record.title}</b><small>年代封签待核</small>`;
+    crate.addEventListener("dragstart", event => event.dataTransfer.setData("text/plain", record.id));
+    crate.addEventListener("dragover", event => event.preventDefault());
+    crate.addEventListener("drop", event => { event.preventDefault(); swapCrates(event.dataTransfer.getData("text/plain"), record.id); });
+    crate.addEventListener("click", () => nudgeCrate(crate)); yard.appendChild(crate);
+  });
+  state.chosen = mixed.map(record => record.id);
+  $("submitAnswer").disabled = false;
+}
+
+function swapCrates(fromId, toId) {
+  if (state.answered || fromId === toId) return;
+  const from = state.chosen.indexOf(fromId), to = state.chosen.indexOf(toId);
+  [state.chosen[from], state.chosen[to]] = [state.chosen[to], state.chosen[from]];
+  renderCrateOrder();
+}
+
+function nudgeCrate(crate) {
+  if (state.answered) return;
+  const index = state.chosen.indexOf(crate.dataset.id);
+  if (!crate.classList.contains("armed")) { $("gameplayArea").querySelectorAll(".archive-crate").forEach(item => item.classList.remove("armed")); crate.classList.add("armed"); return; }
+  const next = (index + 1) % state.chosen.length;
+  [state.chosen[index], state.chosen[next]] = [state.chosen[next], state.chosen[index]];
+  renderCrateOrder();
+}
+
+function renderCrateOrder() {
+  const yard = $("gameplayArea").querySelector(".crate-yard");
+  state.chosen.forEach(id => yard.appendChild(yard.querySelector(`[data-id="${id}"]`)));
+  yard.querySelectorAll(".archive-crate").forEach(crate => crate.classList.remove("armed"));
 }
 function renderReviewQuestion() {
   clearTimeout(agentNudgeTimer);
@@ -443,8 +670,13 @@ function renderReviewQuestion() {
   state.chosen = item.answer; state.answered = true; state.clueUsed = false;
   $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`;
   $("questionText").textContent = item.text;
+  $("questionType").textContent = "校史回顾";
+  $("gameplayArea").className = "gameplay-area";
+  $("gameplayArea").innerHTML = "";
   $("difficulty").textContent = "校史回顾";
   $("clueButton").hidden = true;
+  $("previousQuestion").hidden = true;
+  $("previousReview").hidden = true;
   $("submitAnswer").disabled = false;
   $("submitAnswer").textContent = state.question === stage.questions.length - 1 ? "结束回顾，返回地图" : "下一份档案";
   const options = $("options"); options.innerHTML = "";
@@ -461,12 +693,38 @@ function renderReviewQuestion() {
 }
 function chooseOption(index) { if (state.answered) return; state.chosen = index; [...$("options").children].forEach((el, i) => el.classList.toggle("selected", i === index)); $("submitAnswer").disabled = false; }
 function useClue() { if (state.answered) return; clearTimeout(agentNudgeTimer); const stage = stages[state.selected], item = stage.questions[state.question]; state.clueUsed = true; presentAgent(hebao.giveClue({ stage, question: item })); $("clueButton").disabled = true; $("clueButton").firstChild.textContent = "线索已调阅 "; }
+function answerSummary(item) {
+  if (state.question === 0) return `${String.fromCharCode(65 + state.chosen)} · ${item.options[state.chosen]}`;
+  if (state.question === 1) return state.chosen === "support" ? "证据支持该陈述" : "证据反驳该陈述";
+  return state.chosen.map(id => `${catalogById[id].year} · ${catalogById[id].title}`).join(" → ");
+}
+function showPreviousQuestion() {
+  const record = state.answerHistory[state.question - 1];
+  if (!record) return;
+  $("previousReviewIndex").textContent = `第 ${record.index + 1} 题 · 已封存`;
+  $("previousReviewQuestion").textContent = record.question;
+  $("previousReviewAnswer").textContent = record.answer;
+  $("previousReviewExplanation").textContent = record.explanation;
+  const verdict = $("previousReviewVerdict");
+  verdict.className = `previous-review-verdict ${record.right ? "is-correct" : "is-wrong"}`;
+  verdict.innerHTML = `<strong>${record.right ? "核验正确" : "核验错误"}</strong><span>${record.right ? "答案与档案记录一致" : "答案与档案记录不符"}</span>`;
+  $("previousReview").hidden = false;
+  $("closePreviousReview").focus();
+}
+function closePreviousQuestion() { $("previousReview").hidden = true; $("previousQuestion").focus(); }
 function submitAnswer() {
   if (state.reviewMode) { nextReviewQuestion(); return; }
   if (state.chosen === null) return; if (state.answered) { nextQuestion(); return; }
-  clearTimeout(agentNudgeTimer); state.answered = true; const item = stages[state.selected].questions[state.question], right = state.chosen === item.answer; if (right) { state.correct++; state.wrongStreak = 0; } else state.wrongStreak++;
-  [...$("options").children].forEach((el, i) => { el.disabled = true; if (i === item.answer) el.classList.add("correct"); if (i === state.chosen && !right) el.classList.add("wrong"); });
-  $("feedback").hidden = false; $("feedback").innerHTML = `<strong>${right ? "档案核验通过" : "这份记录需要重新辨认"}</strong><br>${item.explanation}`; $("submitAnswer").textContent = state.question === 2 ? "完成修复" : "下一份档案"; $("submitAnswer").disabled = false; $("clueButton").disabled = true;
+  clearTimeout(agentNudgeTimer); state.answered = true; const item = stages[state.selected].questions[state.question];
+  const right = state.question === 0 ? state.chosen === item.answer : state.question === 1 ? (state.chosen === "support") === evidenceClaim(item).truth : state.chosen.every((id, index) => id === state.timelineOrder[index]);
+  if (right) { state.correct++; state.wrongStreak = 0; } else state.wrongStreak++;
+  if (state.question === 0) $("gameplayArea").querySelectorAll(".archive-lectern").forEach((el, i) => { el.disabled = true; if (i === item.answer) el.classList.add("correct"); if (i === state.chosen && !right) el.classList.add("wrong"); });
+  if (state.question === 1) $("gameplayArea").classList.add(right ? "verified" : "contradicted");
+  if (state.question === 2) $("gameplayArea").querySelectorAll(".archive-crate").forEach((crate, index) => crate.classList.toggle("correct", crate.dataset.id === state.timelineOrder[index]));
+  const timelineExplanation = state.question === 2 ? `正确时间线：${state.timelineOrder.map(id => { const record = catalogById[id]; return `${record.year} · ${record.title}`; }).join(" → ")}` : item.explanation;
+  state.answerHistory[state.question] = { index: state.question, question: $("questionText").textContent, answer: answerSummary(item), right, explanation: timelineExplanation };
+  $("feedback").className = `feedback ${right ? "feedback-correct" : "feedback-wrong"}`;
+  $("feedback").hidden = false; $("feedback").innerHTML = `<strong>${right ? "核验正确" : "核验错误"}</strong><span>${right ? "答案与档案记录一致" : "答案与档案记录不符"}</span><p>${timelineExplanation}</p>`; $("submitAnswer").textContent = state.question === 2 ? "完成修复" : "下一份档案"; $("submitAnswer").disabled = false; $("clueButton").disabled = true;
   presentAgent(hebao.reviewAnswer({ stage: stages[state.selected], question: item, right, clueUsed: state.clueUsed, wrongStreak: state.wrongStreak }));
 }
 function nextReviewQuestion() {
@@ -481,7 +739,7 @@ function nextReviewQuestion() {
 function nextQuestion() {
   if (state.question < 2) { state.question++; renderQuestion(); return; }
   if (state.correct < 2) {
-    state.question = 0; state.correct = 0; renderQuestion();
+    state.question = 0; state.correct = 0; state.answerHistory = []; renderQuestion();
     presentAgent(hebao.reply("本轮只完成了部分核验。取得照片碎片至少需要通过2份档案，我们带着刚才的解释再核对一次。", [], { intent: "retry" }));
     return;
   }
@@ -489,7 +747,7 @@ function nextQuestion() {
 }
 function finishStage() {
   clearTimeout(agentNudgeTimer);
-  const stage = stages[state.selected]; if (!state.completed.includes(stage.id)) { state.completed.push(stage.id); localStorage.setItem("nankai-memory-progress", JSON.stringify(state.completed)); }
+  const stage = stages[state.selected]; if (!state.completed.includes(stage.id)) { state.completed.push(stage.id); safeStorage.set("nankai-memory-progress", JSON.stringify(state.completed)); }
   const chapterIndex = chapterIndexForStage(state.selected), chapter = chapters[chapterIndex];
   const fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id), chapterComplete = chapterCompletedCount(chapterIndex) === chapter.stageIds.length;
   $("storyYear").textContent = stage.year; $("storyTitle").textContent = stage.storyTitle; $("storyText").textContent = stage.story; $("storySource").textContent = `资料来源：${stage.source}`;
@@ -555,11 +813,11 @@ function enableMapAgentMovement() {
     const y = clamp(top, safe, world.clientHeight - agent.offsetHeight - safe);
     agent.style.left = `${x}px`; agent.style.top = `${y}px`; agent.style.right = "auto"; agent.style.bottom = "auto";
     agent.classList.toggle("bubble-right", x < world.clientWidth / 2);
-    if (remember) localStorage.setItem("hebao-map-position", JSON.stringify({ x: x / world.clientWidth, y: y / world.clientHeight }));
+    if (remember) safeStorage.set("hebao-map-position", JSON.stringify({ x: x / world.clientWidth, y: y / world.clientHeight }));
   };
 
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem("hebao-map-position") || "null"); } catch { localStorage.removeItem("hebao-map-position"); }
+  try { saved = JSON.parse(safeStorage.get("hebao-map-position", "null")); } catch { safeStorage.remove("hebao-map-position"); }
   if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) requestAnimationFrame(() => place(saved.x * world.clientWidth, saved.y * world.clientHeight));
 
   handle.addEventListener("pointerdown", event => {
@@ -605,11 +863,11 @@ function enableMapAgentMovement() {
 
 $("enterGame").addEventListener("click", () => { state.selected = Math.min(state.completed.length, stages.length - 1); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); showChapterIntro(activeChapterIndex); });
 $("enterChapter").addEventListener("click", enterActiveChapter);
-$("resetGame").addEventListener("click", () => { localStorage.removeItem("nankai-memory-progress"); state.completed = []; state.selected = 0; activeChapterIndex = 0; renderMap(); });
-$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); show("mapScreen"); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
+$("resetGame").addEventListener("click", () => { safeStorage.remove("nankai-memory-progress"); state.completed = []; state.selected = 0; activeChapterIndex = 0; renderMap(); });
+$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); show("mapScreen"); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("previousQuestion").addEventListener("click", showPreviousQuestion); $("closePreviousReview").addEventListener("click", closePreviousQuestion); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
 $("closeStagePanel").addEventListener("click", closeStagePanel);
 $("mapViewport").addEventListener("click", event => { if (!event.target.closest(".stage-node")) closeStagePanel(); });
 enableMapMovement();
 enableMapAgentMovement();
 
-document.addEventListener("keydown", (event) => { if (!$("quizScreen").hidden && !state.reviewMode && !state.answered && /^[1-4]$/.test(event.key)) chooseOption(Number(event.key) - 1); });
+document.addEventListener("keydown", (event) => { if (!$("quizScreen").hidden && !state.reviewMode && !state.answered && state.question === 0 && /^[1-4]$/.test(event.key)) chooseWalkOption(Number(event.key) - 1); });

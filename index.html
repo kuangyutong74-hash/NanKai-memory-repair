@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#2a0d3d">
   <title>南开记忆修复计划</title>
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <a class="skip-link" href="#game">跳到游戏内容</a>
@@ -88,7 +88,7 @@
                 <small id="mapAgentSource" class="agent-source" hidden></small>
               </div>
             </aside>
-            <div class="map-hud">点击已抵达的建筑进入关卡 · 完成修复后前往下一站</div>
+            <div id="mapHud" class="map-hud">点击已抵达的建筑进入关卡 · 完成修复后前往下一站</div>
           </div>
         </section>
 
@@ -121,12 +121,21 @@
         <article class="question-card parchment">
           <div class="question-heading"><span id="questionType">档案辨识</span><span id="difficulty">基础</span></div>
           <h2 id="questionText"></h2>
+          <div id="gameplayArea" class="gameplay-area" aria-live="polite"></div>
           <div id="options" class="options"></div>
           <div class="question-actions">
+            <button id="previousQuestion" class="previous-button" hidden>查看上一题</button>
             <button id="clueButton" class="clue-button">查阅档案线索 <b id="clueCost">低提示度</b></button>
             <button id="submitAnswer" class="primary-button" disabled>确认答案</button>
           </div>
           <div id="feedback" class="feedback" hidden></div>
+          <aside id="previousReview" class="previous-review" hidden aria-label="上一题只读复核">
+            <div class="previous-review-heading"><div><small id="previousReviewIndex"></small><h3 id="previousReviewQuestion"></h3></div><button id="closePreviousReview" aria-label="关闭上一题复核">返回当前题</button></div>
+            <div id="previousReviewVerdict" class="previous-review-verdict"></div>
+            <p><b>你的答案</b><span id="previousReviewAnswer"></span></p>
+            <p><b>档案说明</b><span id="previousReviewExplanation"></span></p>
+            <small class="previous-review-lock">本轮答案已封存，仅供查看，不能修改。</small>
+          </aside>
         </article>
         <aside class="agent-card">
           <div class="agent-portrait" aria-hidden="true"><img src="assets/hebao-guide.png" alt=""></div>
@@ -155,7 +164,7 @@
       </aside>
     </section>
   </main>
-  <script src="hebao-client.js?v=2"></script>
-  <script src="game.js?v=15"></script>
+  <script src="hebao-client.js?v=3"></script>
+  <script src="game.js?v=18"></script>
 </body>
 </html>

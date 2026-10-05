@@ -36,6 +36,8 @@ class HebaoAgentTests(unittest.TestCase):
         })
         self.assertIn("木斋图书馆", response["text"])
         self.assertIn("老校钟", response["text"])
+        self.assertIn("可以先查看这张地图和地标样式", response["text"])
+        self.assertIn("不能进入关卡体验", response["text"])
         self.assertEqual("route-locked", response["meta"]["intent"])
 
     def test_chapter_completion_mentions_full_reward(self) -> None:

@@ -20,7 +20,10 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       }).then(reply => this.onReply(reply, surface)).catch(() => {
-        this.onReply({ speaker: "荷宝", text: "智能体服务暂时不可用，题库基础解析仍可正常使用。", citations: [], meta: { intent: "fallback" } }, surface);
+        const text = event === "route-locked"
+          ? "这张地图可以预览，但关卡体验仍未解锁。请先完成当前路线，荷宝会在解锁后带你正式进入。"
+          : "智能体服务暂时不可用，题库基础解析仍可正常使用。";
+        this.onReply({ speaker: "荷宝", text, citations: [], meta: { intent: "fallback" } }, surface);
       });
       return this.loading();
     }
