@@ -577,43 +577,27 @@ function chooseWalkOption(index) {
 }
 
 function evidenceClaim(item) {
+  if (item.options.length === 2 && item.options[0] === "正确" && item.options[1] === "错误") {
+    return { truth: item.answer === 0, text: item.text };
+  }
   const truth = state.selected % 2 === 0;
   const claimIndex = truth ? item.answer : item.options.findIndex((_, index) => index !== item.answer);
-  return { truth, text: item.options[claimIndex] };
+  return { truth, text: `${item.text} 给出的答案是“${item.options[claimIndex]}”。` };
 }
 
 function renderEvidenceJudgement(item) {
-  $("questionType").textContent = "证据称量";
+  $("questionType").textContent = "判断题";
   const claim = evidenceClaim(item);
-  $("questionText").textContent = `待核验陈述：${claim.text}`;
+  $("questionText").textContent = "判断下面的说法是否正确";
   const area = $("gameplayArea");
   area.className = "gameplay-area evidence-lab";
-  area.innerHTML = `<div class="claim-slip"><small>待核验陈述</small><strong>${claim.text}</strong></div><div class="scale-dropzone" aria-label="证据称量盘"></div><div class="evidence-deck"></div><div class="judgement-actions"><button data-verdict="support">证据支持</button><button data-verdict="refute">证据反驳</button></div><p class="arena-instruction">先将至少两份证据放上天平，再作判断</p>`;
-  const evidence = [
-    ["照片", stages[state.selected].photo, `查看${stages[state.selected].title}影像中的年代与场景`],
-    ["年表", "", stages[state.selected].year],
-    ["文献", "", item.explanation]
-  ];
-  const deck = area.querySelector(".evidence-deck");
-  evidence.forEach(([label, image, text], index) => {
-    const card = document.createElement("button");
-    card.className = "evidence-card";
-    card.innerHTML = `${image ? `<img src="${image}" alt="">` : `<span class="evidence-mark">${index === 1 ? "年" : "卷"}</span>`}<span><b>${label}</b><small>${text}</small></span>`;
-    card.addEventListener("click", () => { if (state.answered) return; card.classList.toggle("weighed"); updateEvidenceReady(); });
-    deck.appendChild(card);
-  });
+  area.innerHTML = `<div class="claim-slip"><small>题目陈述</small><strong>${claim.text}</strong></div><div class="judgement-actions" role="group" aria-label="请选择正确或错误"><button data-verdict="true">正确</button><button data-verdict="false">错误</button></div><p class="arena-instruction">阅读陈述后，直接选择“正确”或“错误”</p>`;
   area.querySelectorAll("[data-verdict]").forEach(button => button.addEventListener("click", () => {
-    if (area.querySelectorAll(".evidence-card.weighed").length < 2 || state.answered) return;
+    if (state.answered) return;
     state.chosen = button.dataset.verdict;
     area.querySelectorAll("[data-verdict]").forEach(itemButton => itemButton.classList.toggle("selected", itemButton === button));
     $("submitAnswer").disabled = false;
   }));
-}
-
-function updateEvidenceReady() {
-  const area = $("gameplayArea"), count = area.querySelectorAll(".evidence-card.weighed").length;
-  area.classList.toggle("scale-ready", count >= 2);
-  area.querySelector(".arena-instruction").textContent = count >= 2 ? "证据已上秤，请作出支持或反驳判断" : `还需放入 ${2 - count} 份证据`;
 }
 
 function timelineRecords() {
@@ -623,46 +607,79 @@ function timelineRecords() {
 
 function renderTimelineSort(stage) {
   $("questionType").textContent = "推箱归档";
-  $("questionText").textContent = "将四份地标档案按最早出现的年份，从左到右送入时间线。";
+  $("questionText").textContent = "将四份地标档案拖到对应位置，按年份从早到晚排列。";
   const records = timelineRecords();
   state.timelineOrder = [...records].sort((a, b) => a.year - b.year).map(record => record.id);
   const mixed = [...records].reverse();
   const area = $("gameplayArea");
   area.className = "gameplay-area timeline-room";
-  area.innerHTML = `<div class="timeline-rail" aria-label="归档时间线"></div><div class="crate-yard" aria-label="待归档事件箱"></div><img class="timeline-player" src="assets/student-restorer.png" alt="校史记忆修复员"><p class="arena-instruction">拖动档案箱交换位置 · 按年代从早到晚排列</p>`;
+  area.innerHTML = `<div class="timeline-rail" aria-label="从早到晚的四个档案位置"></div><div class="crate-yard" aria-label="待放置档案箱"><p class="yard-label">待放置档案</p></div><img class="timeline-player" src="assets/student-restorer.png" alt="校史记忆修复员"><p class="arena-instruction" aria-live="polite">拖动下方档案箱，放入上方对应的档案位</p>`;
   const rail = area.querySelector(".timeline-rail"), yard = area.querySelector(".crate-yard");
   mixed.forEach((record, index) => {
-    const slot = document.createElement("div"); slot.className = "timeline-slot"; slot.innerHTML = `<small>档案位 ${index + 1}</small><b>待归档</b>`; rail.appendChild(slot);
+    const slot = document.createElement("div");
+    slot.className = "timeline-slot";
+    slot.dataset.slotIndex = String(index);
+    slot.tabIndex = 0;
+    slot.setAttribute("role", "button");
+    slot.setAttribute("aria-label", `档案位 ${index + 1}，${index === 0 ? "最早" : index === 3 ? "最晚" : "待放置"}`);
+    slot.innerHTML = `<span class="slot-label"><small>档案位 ${index + 1}</small><b>${index === 0 ? "最早" : index === 3 ? "最晚" : "待放置"}</b></span>`;
+    slot.addEventListener("dragover", event => { event.preventDefault(); slot.classList.add("drop-target"); });
+    slot.addEventListener("dragleave", () => slot.classList.remove("drop-target"));
+    slot.addEventListener("drop", event => { event.preventDefault(); slot.classList.remove("drop-target"); placeCrate(event.dataTransfer.getData("text/plain"), index); });
+    slot.addEventListener("click", () => placeArmedCrate(index));
+    slot.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); placeArmedCrate(index); } });
+    rail.appendChild(slot);
     const crate = document.createElement("button"); crate.className = "archive-crate"; crate.draggable = true; crate.dataset.id = record.id; crate.innerHTML = `<span class="crate-seal">${String(index + 1).padStart(2, "0")}</span><b>${record.title}</b><small>年代封签待核</small>`;
     crate.addEventListener("dragstart", event => event.dataTransfer.setData("text/plain", record.id));
-    crate.addEventListener("dragover", event => event.preventDefault());
-    crate.addEventListener("drop", event => { event.preventDefault(); swapCrates(event.dataTransfer.getData("text/plain"), record.id); });
-    crate.addEventListener("click", () => nudgeCrate(crate)); yard.appendChild(crate);
+    crate.addEventListener("click", event => { event.stopPropagation(); armCrate(crate); });
+    yard.appendChild(crate);
   });
-  state.chosen = mixed.map(record => record.id);
-  $("submitAnswer").disabled = false;
+  yard.addEventListener("dragover", event => event.preventDefault());
+  yard.addEventListener("drop", event => { event.preventDefault(); returnCrateToYard(event.dataTransfer.getData("text/plain")); });
+  state.chosen = [null, null, null, null];
+  $("submitAnswer").disabled = true;
 }
 
-function swapCrates(fromId, toId) {
-  if (state.answered || fromId === toId) return;
-  const from = state.chosen.indexOf(fromId), to = state.chosen.indexOf(toId);
-  [state.chosen[from], state.chosen[to]] = [state.chosen[to], state.chosen[from]];
-  renderCrateOrder();
+function placeCrate(crateId, slotIndex) {
+  if (state.answered || !crateId) return;
+  const previousSlot = state.chosen.indexOf(crateId);
+  const displacedId = state.chosen[slotIndex];
+  if (previousSlot >= 0) state.chosen[previousSlot] = displacedId || null;
+  state.chosen[slotIndex] = crateId;
+  renderTimelinePlacement();
 }
 
-function nudgeCrate(crate) {
+function armCrate(crate) {
   if (state.answered) return;
-  const index = state.chosen.indexOf(crate.dataset.id);
-  if (!crate.classList.contains("armed")) { $("gameplayArea").querySelectorAll(".archive-crate").forEach(item => item.classList.remove("armed")); crate.classList.add("armed"); return; }
-  const next = (index + 1) % state.chosen.length;
-  [state.chosen[index], state.chosen[next]] = [state.chosen[next], state.chosen[index]];
-  renderCrateOrder();
+  const selected = crate.classList.contains("armed");
+  $("gameplayArea").querySelectorAll(".archive-crate").forEach(item => item.classList.remove("armed"));
+  if (!selected) crate.classList.add("armed");
+  $("gameplayArea").querySelector(".arena-instruction").textContent = selected ? "拖动档案箱，放入上方对应的档案位" : "已选中档案箱，请点击一个档案位放置";
 }
 
-function renderCrateOrder() {
-  const yard = $("gameplayArea").querySelector(".crate-yard");
-  state.chosen.forEach(id => yard.appendChild(yard.querySelector(`[data-id="${id}"]`)));
-  yard.querySelectorAll(".archive-crate").forEach(crate => crate.classList.remove("armed"));
+function placeArmedCrate(slotIndex) {
+  const crate = $("gameplayArea").querySelector(".archive-crate.armed");
+  if (crate) placeCrate(crate.dataset.id, slotIndex);
+}
+
+function returnCrateToYard(crateId) {
+  if (state.answered || !crateId) return;
+  const slotIndex = state.chosen.indexOf(crateId);
+  if (slotIndex >= 0) state.chosen[slotIndex] = null;
+  renderTimelinePlacement();
+}
+
+function renderTimelinePlacement() {
+  const area = $("gameplayArea"), yard = area.querySelector(".crate-yard");
+  area.querySelectorAll(".archive-crate").forEach(crate => { crate.classList.remove("armed"); if (!state.chosen.includes(crate.dataset.id)) yard.appendChild(crate); });
+  state.chosen.forEach((id, index) => {
+    const slot = area.querySelector(`.timeline-slot[data-slot-index="${index}"]`);
+    slot.classList.toggle("filled", Boolean(id));
+    if (id) slot.appendChild(area.querySelector(`.archive-crate[data-id="${id}"]`));
+  });
+  const placed = state.chosen.filter(Boolean).length;
+  $("submitAnswer").disabled = placed < state.timelineOrder.length;
+  area.querySelector(".arena-instruction").textContent = placed === state.timelineOrder.length ? "四份档案已放好，可以确认排序" : `已放置 ${placed} / ${state.timelineOrder.length} 份档案`;
 }
 function renderReviewQuestion() {
   clearTimeout(agentNudgeTimer);
@@ -695,7 +712,7 @@ function chooseOption(index) { if (state.answered) return; state.chosen = index;
 function useClue() { if (state.answered) return; clearTimeout(agentNudgeTimer); const stage = stages[state.selected], item = stage.questions[state.question]; state.clueUsed = true; presentAgent(hebao.giveClue({ stage, question: item })); $("clueButton").disabled = true; $("clueButton").firstChild.textContent = "线索已调阅 "; }
 function answerSummary(item) {
   if (state.question === 0) return `${String.fromCharCode(65 + state.chosen)} · ${item.options[state.chosen]}`;
-  if (state.question === 1) return state.chosen === "support" ? "证据支持该陈述" : "证据反驳该陈述";
+  if (state.question === 1) return state.chosen === "true" ? "正确" : "错误";
   return state.chosen.map(id => `${catalogById[id].year} · ${catalogById[id].title}`).join(" → ");
 }
 function showPreviousQuestion() {
@@ -716,11 +733,11 @@ function submitAnswer() {
   if (state.reviewMode) { nextReviewQuestion(); return; }
   if (state.chosen === null) return; if (state.answered) { nextQuestion(); return; }
   clearTimeout(agentNudgeTimer); state.answered = true; const item = stages[state.selected].questions[state.question];
-  const right = state.question === 0 ? state.chosen === item.answer : state.question === 1 ? (state.chosen === "support") === evidenceClaim(item).truth : state.chosen.every((id, index) => id === state.timelineOrder[index]);
+  const right = state.question === 0 ? state.chosen === item.answer : state.question === 1 ? (state.chosen === "true") === evidenceClaim(item).truth : state.chosen.every((id, index) => id === state.timelineOrder[index]);
   if (right) { state.correct++; state.wrongStreak = 0; } else state.wrongStreak++;
   if (state.question === 0) $("gameplayArea").querySelectorAll(".archive-lectern").forEach((el, i) => { el.disabled = true; if (i === item.answer) el.classList.add("correct"); if (i === state.chosen && !right) el.classList.add("wrong"); });
   if (state.question === 1) $("gameplayArea").classList.add(right ? "verified" : "contradicted");
-  if (state.question === 2) $("gameplayArea").querySelectorAll(".archive-crate").forEach((crate, index) => crate.classList.toggle("correct", crate.dataset.id === state.timelineOrder[index]));
+  if (state.question === 2) $("gameplayArea").querySelectorAll(".archive-crate").forEach(crate => { const index = state.chosen.indexOf(crate.dataset.id); crate.classList.toggle("correct", index >= 0 && crate.dataset.id === state.timelineOrder[index]); });
   const timelineExplanation = state.question === 2 ? `正确时间线：${state.timelineOrder.map(id => { const record = catalogById[id]; return `${record.year} · ${record.title}`; }).join(" → ")}` : item.explanation;
   state.answerHistory[state.question] = { index: state.question, question: $("questionText").textContent, answer: answerSummary(item), right, explanation: timelineExplanation };
   $("feedback").className = `feedback ${right ? "feedback-correct" : "feedback-wrong"}`;

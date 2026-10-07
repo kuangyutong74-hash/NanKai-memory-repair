@@ -80,10 +80,14 @@
     }
 
     introduceQuestion({ stage, question, questionIndex, wrongStreak }) {
-      if (wrongStreak >= 2) return this.reply("你连续遇到了两处冲突记录。我先替你排除一项明显不符的信息，正确答案仍由你判断。", [], { intent: "adaptive-assist", eliminateDistractor: true });
       const chunks = this.retrieve(`${stage.title} ${question.text}`, { stageId: stage.id, topK: 1 });
-      const text = questionIndex === 0 ? "先观察题干里的时间、人物与地点，它们是最可靠的检索词。" : "把上一份档案中的时间线带到这一题，答案通常有连续关系。";
-      return this.reply(text, chunks, { intent: "question-intro" });
+      const introductions = [
+        "这是档案选择题。点击一座档案台选择答案，再点击“确认核验”；题干里的时间、人物和地点是重要线索。",
+        "这是判断题。读完陈述后，认为符合校史记录就选“正确”，认为不符合就选“错误”，然后确认答案。",
+        "这是时间排序题。把下方四份档案拖到上方1—4号位置，按年份从早到晚排列；手机上也可以先点档案箱，再点目标位置。"
+      ];
+      const text = `${introductions[questionIndex] || introductions[0]}${wrongStreak >= 2 ? " 你连续遇到了两处冲突记录，这一题我会提供额外辅助。" : ""}`;
+      return this.reply(text, chunks, { intent: wrongStreak >= 2 ? "adaptive-assist" : "question-intro", eliminateDistractor: wrongStreak >= 2 });
     }
 
     nudge({ stage, question }) {

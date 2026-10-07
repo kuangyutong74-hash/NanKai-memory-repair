@@ -123,12 +123,14 @@ class HebaoAgent:
                 )
             citations = []
         elif event == "question-intro":
-            if context.get("wrongStreak", 0) >= 2:
-                text = "你连续遇到了两处冲突记录。我先替你排除一项明显不符的信息，正确答案仍由你判断。"
-            elif context.get("questionIndex", 0) == 0:
-                text = "先观察题干里的时间、人物与地点，它们是最可靠的检索词。"
+            if context.get("questionIndex", 0) == 0:
+                text = "这是档案选择题。点击一座档案台选择答案，再点击“确认核验”；题干里的时间、人物和地点是重要线索。"
+            elif context.get("questionIndex", 0) == 1:
+                text = "这是判断题。读完陈述后，认为符合校史记录就选“正确”，认为不符合就选“错误”，然后确认答案。"
             else:
-                text = "把上一份档案中的时间线带到这一题，答案通常有连续关系。"
+                text = "这是时间排序题。把下方四份档案拖到上方1—4号位置，按年份从早到晚排列；手机上也可以先点档案箱，再点目标位置。"
+            if context.get("wrongStreak", 0) >= 2:
+                text += " 你连续遇到了两处冲突记录，这一题我会提供额外辅助。"
         elif event == "nudge":
             text = "我注意到你停留了一会儿。先锁定题干中的时间、人物或地点；仍然犹豫时，可以调阅一条低提示度线索。"
         elif event == "clue":
