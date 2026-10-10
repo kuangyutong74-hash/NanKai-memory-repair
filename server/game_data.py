@@ -3,22 +3,22 @@
 CHAPTERS = [
     {
         "id": "origin",
-        "title": "1919—1948",
-        "subtitle": "私立南开、战火南迁与复校",
+        "title": "荒洼上的大学",
+        "subtitle": "1919—1948",
         "background": "assets/campus-empty-plots.png",
         "stageIds": ["bell", "mati", "xiushan", "siyuan", "library"],
     },
     {
         "id": "rebuild",
-        "title": "1949—1978",
-        "subtitle": "院系调整与校园重建",
+        "title": "新南开",
+        "subtitle": "1949—1978",
         "background": "assets/campus-route-panorama.png",
         "stageIds": ["xinkai", "haibing", "wenzhong", "main"],
     },
     {
         "id": "renewal",
-        "title": "1979—至今",
-        "subtitle": "开放发展、双校区与新的百年",
+        "title": "百年南开",
+        "subtitle": "1979—今",
         "background": "assets/campus-map.png",
         "stageIds": ["zhou", "lianda", "yifu", "today", "three"],
     },

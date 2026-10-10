@@ -121,6 +121,10 @@
         <article class="question-card parchment">
           <div class="question-heading"><span id="questionType">档案辨识</span><span id="difficulty">基础</span></div>
           <h2 id="questionText"></h2>
+          <figure id="questionMedia" class="question-media" hidden>
+            <img id="questionImage" src="assets/archive-opening.jpg" alt="">
+            <figcaption id="questionImageCaption"></figcaption>
+          </figure>
           <div id="gameplayArea" class="gameplay-area" aria-live="polite"></div>
           <div id="options" class="options"></div>
           <div class="question-actions">
@@ -150,6 +154,7 @@
         <div class="story-copy">
           <p id="storyYear"></p>
           <h1 id="storyTitle"></h1>
+          <figure id="storyMedia" class="story-media" hidden><img id="storyImage" src="assets/archive-opening.jpg" alt=""><figcaption id="storyImageCaption"></figcaption></figure>
           <p id="storyText"></p>
           <p id="storySource" class="story-source"></p>
         </div>
@@ -165,6 +170,7 @@
     </section>
   </main>
   <script src="hebao-client.js?v=3"></script>
-  <script src="game.js?v=21"></script>
+  <script src="content-data.js?v=2"></script>
+  <script src="game.js?v=22"></script>
 </body>
 </html>
