@@ -29,8 +29,6 @@ chapters.forEach(chapter => chapter.stageIds.forEach((id, index) => {
   stage.chapterId = chapter.id; stage.x = x; stage.y = y; stage.walkX = x; stage.walkY = y < 50 ? 43 : 91;
 }));
 
-function q(text, options, answer, explanation, clue) { return { text, options, answer, explanation, clue }; }
-
 const safeStorage = {
   get(key, fallback = null) { try { return window.localStorage?.getItem(key) ?? fallback; } catch { return fallback; } },
   set(key, value) { try { window.localStorage?.setItem(key, value); } catch { /* 无持久存储时保留本轮内存进度 */ } },
@@ -40,11 +38,107 @@ let savedProgress = [];
 try { savedProgress = JSON.parse(safeStorage.get("nankai-memory-progress", "[]")); } catch { safeStorage.remove("nankai-memory-progress"); }
 if (!Array.isArray(savedProgress)) savedProgress = [];
 const state = { completed: savedProgress, selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0, reviewMode: false, timelineOrder: [], answerHistory: [] };
+let gameStats = { startedAt: null, finishedAt: null, correct: 0, total: 0, clues: 0 };
+let albumState = { unlocked: false, opened: false, readPages: [], currentPage: 0, completedEnding: false, muted: false, record: null };
+try { gameStats = { ...gameStats, ...JSON.parse(safeStorage.get("nankai-memory-stats", "{}")) }; } catch { safeStorage.remove("nankai-memory-stats"); }
+try { albumState = { ...albumState, ...JSON.parse(safeStorage.get("nankai-memory-album", "{}")) }; } catch { safeStorage.remove("nankai-memory-album"); }
 const $ = (id) => document.getElementById(id);
 const hebao = new HebaoClient({ endpoint: window.HEBAO_CONFIG?.endpoint || "/api/agent/event", onReply: presentAgent });
 let agentNudgeTimer = null;
 let mapAgentBubbleTimer = null;
 let activeChapterIndex = 0;
+let chapterMenuOpen = false;
+let chapterMenuFocusIndex = 0;
+let accountMode = "login";
+
+function setAccountMessage(message, tone = "") {
+  const target = $("accountMessage");
+  target.textContent = message;
+  target.dataset.tone = tone;
+}
+
+function renderAccount() {
+  const user = window.nankaiAccount.user;
+  $("accountGuest").hidden = Boolean(user);
+  $("accountSignedIn").hidden = !user;
+  if (!user) {
+    $("restorerRecord").textContent = "修复员：游客档案";
+    return;
+  }
+  $("accountDisplayName").textContent = user.displayName;
+  $("restorerRecord").textContent = `修复员：${user.displayName}`;
+}
+
+function setAccountMode(mode) {
+  accountMode = mode;
+  const registering = mode === "register";
+  $("loginTab").classList.toggle("active", !registering);
+  $("registerTab").classList.toggle("active", registering);
+  $("loginTab").setAttribute("aria-selected", String(!registering));
+  $("registerTab").setAttribute("aria-selected", String(registering));
+  $("displayNameField").hidden = !registering;
+  $("displayName").required = registering;
+  $("accountPassword").autocomplete = registering ? "new-password" : "current-password";
+  $("accountSubmit").textContent = registering ? "创建档案并保存进度" : "登录并读取存档";
+  setAccountMessage("");
+}
+
+async function syncAccountProgress() {
+  const remote = await window.nankaiAccount.loadSave();
+  const validIds = new Set(stages.map(stage => stage.id));
+  const localOwner = safeStorage.get("nankai-memory-owner", "");
+  const localProgress = !localOwner || localOwner === window.nankaiAccount.user.username ? state.completed : [];
+  const merged = [...new Set([...localProgress, ...(remote.completed || [])])].filter(id => validIds.has(id));
+  state.completed = stages.filter(stage => merged.includes(stage.id)).map(stage => stage.id);
+  safeStorage.set("nankai-memory-owner", window.nankaiAccount.user.username);
+  safeStorage.set("nankai-memory-progress", JSON.stringify(state.completed));
+  await window.nankaiAccount.save(state.completed);
+  renderMap();
+}
+
+async function persistProgress() {
+  safeStorage.set("nankai-memory-progress", JSON.stringify(state.completed));
+  if (!window.nankaiAccount.user) return;
+  safeStorage.set("nankai-memory-owner", window.nankaiAccount.user.username);
+  $("accountSyncState").textContent = "正在保存…";
+  try {
+    await window.nankaiAccount.save(state.completed);
+    $("accountSyncState").textContent = "账号存档已同步";
+  } catch {
+    $("accountSyncState").textContent = "云端暂未同步，本地记录已保留";
+  }
+}
+
+async function initializeAccount() {
+  await window.nankaiAccount.restore();
+  renderAccount();
+  if (window.nankaiAccount.user) {
+    try { await syncAccountProgress(); } catch { $("accountSyncState").textContent = "云端暂未同步，本地记录已保留"; }
+  }
+}
+
+async function submitAccount(event) {
+  event.preventDefault();
+  const submit = $("accountSubmit");
+  const fields = {
+    username: $("accountUsername").value.trim(),
+    password: $("accountPassword").value,
+    ...(accountMode === "register" ? { displayName: $("displayName").value.trim() } : {})
+  };
+  submit.disabled = true;
+  setAccountMessage(accountMode === "register" ? "正在建立修复员档案…" : "正在核验档案…");
+  try {
+    if (accountMode === "register") await window.nankaiAccount.register(fields);
+    else await window.nankaiAccount.login(fields);
+    await syncAccountProgress();
+    renderAccount();
+    $("accountForm").reset();
+  } catch (error) {
+    setAccountMessage(error.message, "error");
+  } finally {
+    submit.disabled = false;
+  }
+}
 
 function setMapAgentOpen(open, autoClose = false) {
   const agent = $("mapAgent"), handle = $("mapAgentHandle");
@@ -59,16 +153,28 @@ function presentAgent(reply, surface = "quiz") {
     $("agentReview").textContent = `荷宝：${reply.text}${reply.citations[0] ? `（${reply.citations[0].label}）` : ""}`;
     return;
   }
-  const speech = surface === "map" ? $("mapAgentSpeech") : $("agentSpeech");
-  const source = surface === "map" ? $("mapAgentSource") : $("agentSource");
+  const speech = surface === "intro" ? $("introAgentSpeech") : surface === "map" ? $("mapAgentSpeech") : $("agentSpeech");
+  const source = surface === "intro" ? $("introAgentSource") : surface === "map" ? $("mapAgentSource") : $("agentSource");
   speech.textContent = reply.text;
   const labels = reply.citations.map(citation => citation.label);
   source.textContent = labels.join("；");
   source.hidden = labels.length === 0;
-  if (surface === "map") setMapAgentOpen(true, true);
+  if (surface === "map") setMapAgentOpen(true);
 }
 
-function show(screen) { ["intro", "chapterIntro", "mapScreen", "quizScreen", "storyScreen"].forEach(id => $(id).hidden = id !== screen); window.scrollTo(0, 0); }
+function show(screen) { ["intro", "chapterIntro", "mapScreen", "quizScreen", "storyScreen"].forEach(id => $(id).hidden = id !== screen); window.scrollTo(0, 0); requestAnimationFrame(renderAlbumDock); }
+function showMapWithHebao() {
+  show("mapScreen");
+  setMapAgentOpen(true);
+}
+function returnToCover() {
+  clearTimeout(agentNudgeTimer);
+  closeStagePanel();
+  state.reviewMode = false;
+  $("quizScreen").classList.remove("review-mode");
+  show("intro");
+  $("enterGame").focus();
+}
 function showChapterIntro(chapterIndex) {
   activeChapterIndex = chapterIndex;
   const chapter = chapters[chapterIndex], intro = $("chapterIntro");
@@ -86,7 +192,7 @@ function showChapterIntro(chapterIndex) {
 }
 function enterActiveChapter() {
   renderMap();
-  show("mapScreen");
+  showMapWithHebao();
   setTimeout(() => moveCameraTo(state.selected), 80);
 }
 function isUnlocked(index) { return index === 0 || state.completed.includes(stages[index - 1].id); }
@@ -131,6 +237,37 @@ function isChapterUnlocked(chapterIndex) {
   if (chapterIndex === 0) return true;
   return chapters.slice(0, chapterIndex).every(chapter => chapter.stageIds.every(id => state.completed.includes(id)));
 }
+function chapterStatus(chapterIndex) {
+  const completed = chapterCompletedCount(chapterIndex);
+  const total = chapters[chapterIndex].stageIds.length;
+  if (!isChapterUnlocked(chapterIndex)) return "未解锁";
+  if (completed === total) return "已完成";
+  return chapterIndex === activeChapterIndex ? "进行中" : "已解锁";
+}
+function setChapterMenuOpen(open, focusIndex = activeChapterIndex) {
+  chapterMenuOpen = open;
+  const trigger = $("chapterSelectTrigger"), menu = $("chapterMenu");
+  if (!trigger || !menu) return;
+  trigger.setAttribute("aria-expanded", String(open));
+  menu.hidden = !open;
+  $("chapterNav").classList.toggle("open", open);
+  if (!open) return;
+  chapterMenuFocusIndex = Math.max(0, Math.min(focusIndex, chapters.length - 1));
+  requestAnimationFrame(() => menu.querySelector(`[data-chapter-index="${chapterMenuFocusIndex}"]`)?.focus());
+}
+function chooseChapter(index, trigger = null) {
+  const unlocked = isChapterUnlocked(index);
+  activeChapterIndex = index;
+  const chapterIndices = chapterStageIndices(index);
+  state.selected = chapterIndices.includes(state.selected) ? state.selected : chapterIndices[0];
+  closeStagePanel();
+  setChapterMenuOpen(false);
+  renderMap();
+  showMapWithHebao();
+  setTimeout(() => moveCameraTo(state.selected), 80);
+  if (!unlocked) notifyLockedRoute({ targetChapter: chapters[index] });
+  $("chapterSelectTrigger")?.focus();
+}
 function notifyLockedRoute({ targetStage = null, targetChapter = null, trigger = null }) {
   const targetIndex = targetStage ? stages.indexOf(targetStage) : chapterStageIndices(chapters.indexOf(targetChapter))[0];
   let prerequisite = stages[Math.max(0, targetIndex - 1)];
@@ -140,13 +277,9 @@ function notifyLockedRoute({ targetStage = null, targetChapter = null, trigger =
     if (blockingChapter) prerequisite = catalogById[blockingChapter.stageIds.at(-1)];
   }
   const nextStage = stages[reachedStageIndex()];
-  const reply = hebao.guardRoute({
-    targetType: targetChapter ? "chapter" : "stage",
-    targetStage,
-    targetChapter,
-    prerequisite,
-    nextStage
-  });
+  const reply = targetChapter
+    ? { speaker: "荷宝", text: `现在可以预览“${targetChapter.title}”的地图，但关卡尚未解锁。完成上一阶段“${chapters[chapters.indexOf(targetChapter) - 1].title}”后即可进入。`, citations: [], meta: { intent: "chapter-preview" } }
+    : hebao.guardRoute({ targetType: "stage", targetStage, targetChapter, prerequisite, nextStage });
   presentAgent(reply, "map");
   if (trigger) {
     trigger.classList.remove("denied");
@@ -155,26 +288,43 @@ function notifyLockedRoute({ targetStage = null, targetChapter = null, trigger =
   }
 }
 function renderChapterNav() {
-  const nav = $("chapterNav"); nav.innerHTML = "";
+  const nav = $("chapterNav");
+  const activeChapter = chapters[activeChapterIndex];
+  const activeCompleted = chapterCompletedCount(activeChapterIndex);
+  nav.innerHTML = `<button id="chapterSelectTrigger" class="chapter-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="${chapterMenuOpen}" aria-controls="chapterMenu"><span class="chapter-select-copy"><small>阶段选择</small><strong title="${activeChapter.title}">${activeChapter.title}</strong></span><span class="chapter-select-progress" aria-label="当前阶段碎片进度">${activeCompleted}／${activeChapter.stageIds.length}</span><svg class="chapter-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 6 5 5 5-5"/></svg></button><div id="chapterMenu" class="chapter-menu" role="listbox" aria-label="选择校史阶段" ${chapterMenuOpen ? "" : "hidden"}></div>`;
+  const trigger = $("chapterSelectTrigger"), menu = $("chapterMenu");
+  trigger.addEventListener("click", () => setChapterMenuOpen(!chapterMenuOpen));
+  trigger.addEventListener("keydown", event => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const target = event.key === "ArrowUp" || event.key === "End" ? chapters.length - 1 : 0;
+    setChapterMenuOpen(true, target);
+  });
   chapters.forEach((chapter, index) => {
     const button = document.createElement("button"), chapterIndices = chapterStageIndices(index);
     const completed = chapterIndices.filter(stageIndex => state.completed.includes(stages[stageIndex].id)).length;
     const unlocked = isChapterUnlocked(index);
-    button.className = `chapter-tab ${index === activeChapterIndex ? "active" : ""} ${unlocked ? "" : "locked"}`;
+    const status = chapterStatus(index), complete = completed === chapterIndices.length;
+    button.type = "button";
+    button.className = `chapter-option ${index === activeChapterIndex ? "active" : ""} ${unlocked ? "" : "locked"} ${complete ? "complete" : ""}`;
+    button.dataset.chapterIndex = String(index);
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(index === activeChapterIndex));
     button.setAttribute("aria-current", index === activeChapterIndex ? "page" : "false");
-    button.setAttribute("aria-label", `${chapter.title}，${unlocked ? `${completed}/${chapterIndices.length}块碎片已收集` : "尚未解锁，可以预览地图，不能进入关卡"}`);
-    button.innerHTML = `<strong>${chapter.title}</strong><span>${unlocked ? `${completed}/${chapterIndices.length}` : "地图预览"}</span>`;
-    button.addEventListener("click", () => {
-      activeChapterIndex = index;
-      state.selected = chapterIndices.includes(state.selected) ? state.selected : chapterIndices[0];
-      closeStagePanel();
-      if (unlocked) { showChapterIntro(index); return; }
-      renderMap();
-      show("mapScreen");
-      setTimeout(() => moveCameraTo(state.selected), 80);
-      notifyLockedRoute({ targetChapter: chapter, trigger: document.querySelector(`.chapter-tab:nth-child(${index + 1})`) });
+    button.setAttribute("aria-label", `${chapter.title}，${unlocked ? `${completed}/${chapterIndices.length}块碎片已收集，${status}` : "未解锁，可以预览地图，完成上一阶段后解锁关卡"}`);
+    button.innerHTML = `<span class="chapter-option-mark" aria-hidden="true">${unlocked ? (complete ? `<svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg>` : `<span></span>`) : `<svg viewBox="0 0 20 20"><rect x="4.5" y="8.5" width="11" height="8" rx="1"/><path d="M7 8.5V6a3 3 0 0 1 6 0v2.5"/></svg>`}</span><span class="chapter-option-copy"><strong title="${chapter.title}">${chapter.title}</strong><small>${unlocked ? status : "可预览地图 · 完成上一阶段后解锁"}</small></span><span class="chapter-option-progress">${unlocked ? `${completed}／${chapterIndices.length}` : "未解锁"}</span>`;
+    button.addEventListener("click", () => chooseChapter(index, button));
+    button.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); setChapterMenuOpen(false); trigger.focus(); return; }
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); chooseChapter(index, button); return; }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      if (event.key === "Home") chapterMenuFocusIndex = 0;
+      else if (event.key === "End") chapterMenuFocusIndex = chapters.length - 1;
+      else chapterMenuFocusIndex = (index + (event.key === "ArrowDown" ? 1 : -1) + chapters.length) % chapters.length;
+      menu.querySelector(`[data-chapter-index="${chapterMenuFocusIndex}"]`)?.focus();
     });
-    nav.appendChild(button);
+    menu.appendChild(button);
   });
 }
 function reachedStageIndex() { return Math.min(state.completed.length, stages.length - 1); }
@@ -466,7 +616,7 @@ function renderReviewQuestion() {
   presentAgent({ speaker: "荷宝", text: `这处地标已经完成修复。现在不用重新作答，我们直接查看第${state.question + 1}份档案的答案与校史依据。`, citations: [{ label: stage.source }], meta: { intent: "review" } });
 }
 function chooseOption(index) { if (state.answered) return; state.chosen = index; [...$("options").children].forEach((el, i) => el.classList.toggle("selected", i === index)); $("submitAnswer").disabled = false; }
-function useClue() { if (state.answered) return; clearTimeout(agentNudgeTimer); const stage = stages[state.selected], item = stage.questions[state.question]; state.clueUsed = true; presentAgent(hebao.giveClue({ stage, question: item })); $("clueButton").disabled = true; $("clueButton").firstChild.textContent = "线索已调阅 "; }
+function useClue() { if (state.answered) return; clearTimeout(agentNudgeTimer); const stage = stages[state.selected], item = stage.questions[state.question]; state.clueUsed = true; gameStats.clues++; saveGameStats(); presentAgent(hebao.giveClue({ stage, question: item })); $("clueButton").disabled = true; $("clueButton").firstChild.textContent = "线索已调阅 "; }
 function answerSummary(item) {
   if (item.type === "sort") return state.chosen.map(id => item.options[Number(id.replace("option-", ""))]).join(" → ");
   if (item.type === "judge") return state.chosen === "true" ? "正确" : "错误";
@@ -491,6 +641,7 @@ function submitAnswer() {
   if (state.chosen === null) return; if (state.answered) { nextQuestion(); return; }
   clearTimeout(agentNudgeTimer); state.answered = true; const item = stages[state.selected].questions[state.question];
   const right = item.type === "choice" ? state.chosen === item.answer : item.type === "judge" ? (state.chosen === "true") === evidenceClaim(item).truth : state.chosen.every((id, index) => id === state.timelineOrder[index]);
+  gameStats.total++; if (right) gameStats.correct++; saveGameStats();
   if (right) { state.correct++; state.wrongStreak = 0; } else state.wrongStreak++;
   if (item.type === "choice") $("gameplayArea").querySelectorAll(".archive-lectern").forEach((el, i) => { el.disabled = true; if (i === item.answer) el.classList.add("correct"); if (i === state.chosen && !right) el.classList.add("wrong"); });
   if (item.type === "judge") $("gameplayArea").classList.add(right ? "verified" : "contradicted");
@@ -523,7 +674,7 @@ function nextQuestion() {
 }
 function finishStage() {
   clearTimeout(agentNudgeTimer);
-  const stage = stages[state.selected]; if (!state.completed.includes(stage.id)) { state.completed.push(stage.id); safeStorage.set("nankai-memory-progress", JSON.stringify(state.completed)); }
+  const stage = stages[state.selected], newlyCompleted = !state.completed.includes(stage.id); if (newlyCompleted) { state.completed.push(stage.id); persistProgress(); }
   const chapterIndex = chapterIndexForStage(state.selected), chapter = chapters[chapterIndex];
   const fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id), chapterComplete = chapterCompletedCount(chapterIndex) === chapter.stageIds.length;
   $("storyYear").textContent = stage.year; $("storyTitle").textContent = stage.storyTitle; $("storyText").textContent = stage.story; $("storySource").textContent = `资料来源：${stage.source}`;
@@ -536,6 +687,13 @@ function finishStage() {
   $("continueJourney").textContent = chapterComplete ? (state.selected === stages.length - 1 ? "收录完整影像，完成修复" : "收录完整影像，开启下一章") : "收好碎片，继续寻迹";
   const summary = hebao.summarizeStage({ stage, correct: state.correct, chapterComplete, rewardTitle: chapter.rewardTitle, fragmentName: chapter.fragmentNames[fragmentPosition] });
   $("agentReview").textContent = `荷宝：${summary.text}`; show("storyScreen");
+  if (newlyCompleted && state.completed.length === stages.length) {
+    const firstUnlock = !albumState.unlocked;
+    gameStats.finishedAt = Date.now(); saveGameStats();
+    albumState.record = { ...gameStats, completed: state.completed.length }; saveAlbumState();
+    if (firstUnlock) setTimeout(() => unlockAlbum(true), window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 750);
+    else { renderAlbumDock(); showAlbumHint("这一轮的校史记忆也已经完整归档。相册中的通关记录已更新，随时可以再次翻阅。", true); }
+  }
 }
 
 function moveCameraTo(index) {
@@ -551,7 +709,7 @@ function journeyToNextStage() {
   const nextChapterIndex = chapterIndexForStage(next), changesChapter = nextChapterIndex !== activeChapterIndex;
   if (changesChapter) activeChapterIndex = nextChapterIndex;
   renderMap(from);
-  show("mapScreen");
+  showMapWithHebao();
   closeStagePanel();
   if (isFinal) { setStudentPosition(from); updateMapAgent(from); return; }
   if (changesChapter) {
@@ -570,6 +728,146 @@ function journeyToNextStage() {
       document.querySelectorAll(".stage-node").forEach(node => node.classList.toggle("selected", Number(node.dataset.stageIndex) === next));
     }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 80 : 1900);
   }));
+}
+
+const albumPages = [
+  { title: "从旧时光出发", period: "1919—1948 · 从哪里来", image: chapters[0].rewardImage, caption: chapters[0].rewardCaption, text: "那时的校园尚未拥有今天的模样，许多道路还没有名字，许多故事也才刚刚开始。\n\n但正是在并不宽阔的天地里，一群人把目光投向了更远的地方。他们相信，教育能够改变个人的命运，也能够回应一个时代的追问。\n\n岁月带走了当年的声音，却没有带走那份出发时的坚定。我们今天走过的路，正从他们迈出的第一步延伸而来。" },
+  { title: "在风雨中守望", period: "1949—1978 · 经历了什么", image: chapters[1].rewardImage, caption: chapters[1].rewardCaption, text: "历史从来不只由鲜花和掌声写成。风雨到来时，书桌也许简陋，前路也许未明，但求知的灯火从未真正熄灭。\n\n一代代师生在动荡中守住课堂，在困顿中守住理想。他们留下的，不只是某一次选择或某一段经历，而是一种面对时代时不肯退后的姿态。\n\n所谓传承，或许正是多年以后，我们仍能从这张照片里感受到那份沉默而坚定的力量。" },
+  { title: "把记忆交给未来", period: "1979—今 · 将走向哪里", image: chapters[2].rewardImage, caption: chapters[2].rewardCaption, text: "照片停住了一个瞬间，时间却仍在继续向前。曾经站在镜头前的人，或许未曾见过今天的校园，却把他们相信的事情留给了后来者。\n\n如今，我们在同一片土地上读书、行走，也在用自己的经历续写新的篇章。校史并不是一册合上后便沉默的旧书，它藏在每一次选择、每一份坚持，也藏在年轻目光望向未来的方向里。\n\n当你记住这些故事，你也已经成为故事的一部分。" }
+];
+const memorialText = "恭喜你，完成了这场跨越时光的校史探寻。\n\n那些散落在旧照片、文字和往事中的记忆，因为你的寻找，再次变得清晰。\n\n历史并不只停留在过去。当它被看见、被理解、被记住，也就有了新的回声。";
+const endingText = "谢谢你，让这些沉睡的记忆再次被看见。\n\n相册可以合上，故事却仍在继续。\n\n愿你带着从历史中得到的勇气与温度，走向属于自己的远方。";
+let albumPageIndex = 0, typewriterTimer = null, typewriterText = "", typewriterTarget = null, lastAlbumFocus = null, audioContext = null;
+
+function saveGameStats() { safeStorage.set("nankai-memory-stats", JSON.stringify(gameStats)); }
+function saveAlbumState() { safeStorage.set("nankai-memory-album", JSON.stringify(albumState)); }
+function albumUnlocked() { return albumState.unlocked || state.completed.length === stages.length; }
+function formatDuration(startedAt, finishedAt) {
+  if (!startedAt || !finishedAt) return "";
+  const seconds = Math.max(0, Math.round((finishedAt - startedAt) / 1000));
+  return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, "0")}秒`;
+}
+function renderAlbumDock() {
+  const dock = $("albumDock"), button = $("albumButton"), unlocked = albumUnlocked();
+  dock.hidden = $("intro").hidden === false;
+  button.classList.toggle("unlocked", unlocked);
+  button.setAttribute("aria-label", unlocked ? "校史相册，已经解锁，可以打开" : `校史相册，尚未解锁，已收集${state.completed.length}/${stages.length}块碎片`);
+  $("albumDockStatus").textContent = unlocked ? (albumState.completedEnding ? "已珍藏" : "已解锁") : `${state.completed.length}／${stages.length}`;
+}
+function showAlbumHint(text, action = false) {
+  $("albumHintText").textContent = text;
+  $("albumHintAction").hidden = !action;
+  $("albumHintMenu").hidden = true;
+  $("albumHint").hidden = false;
+}
+function unlockAlbum(firstTime = true) {
+  if (!albumState.unlocked) {
+    albumState.unlocked = true;
+    albumState.record = { ...gameStats, finishedAt: gameStats.finishedAt || (firstTime ? Date.now() : null), completed: state.completed.length };
+    saveAlbumState();
+  }
+  renderAlbumDock();
+  if (!firstTime) return;
+  $("albumButton").classList.add("unlocking");
+  setTimeout(() => $("albumButton").classList.remove("unlocking"), 1250);
+  showAlbumHint("同学，你找到的每一条线索，都已经回到了它应在的位置。\n\n那本等待已久的相册，也终于被重新唤醒了。\n\n去打开它吧，这一次，它记录的不只是校史，也记录着你的旅程。", true);
+}
+function playTypeClick(index) {
+  if (albumState.muted || index % 3 !== 0 || !window.AudioContext) return;
+  try {
+    audioContext ||= new AudioContext();
+    const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
+    oscillator.type = "triangle"; oscillator.frequency.value = 760 + (index % 4) * 35;
+    gain.gain.setValueAtTime(.018, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + .025);
+    oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + .03);
+  } catch { /* 音频不可用不影响文字 */ }
+}
+function stopTypewriter(showFull = false) {
+  clearTimeout(typewriterTimer); typewriterTimer = null;
+  if (typewriterTarget) {
+    if (showFull) typewriterTarget.textContent = typewriterText;
+    typewriterTarget.classList.remove("typing");
+  }
+}
+function typeText(target, text, onComplete) {
+  stopTypewriter(); typewriterTarget = target; typewriterText = text;
+  const alreadyRead = albumState.readPages.includes(albumPageIndex) || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (alreadyRead) { target.textContent = text; target.classList.remove("typing"); onComplete?.(); return; }
+  target.textContent = ""; target.classList.add("typing"); let index = 0;
+  const step = () => {
+    if (index >= text.length) {
+      target.classList.remove("typing");
+      albumState.readPages = [...new Set([...albumState.readPages, albumPageIndex])]; saveAlbumState(); onComplete?.(); return;
+    }
+    const character = text[index++]; target.textContent += character;
+    if (!/[，。！？；：\n]/.test(character)) playTypeClick(index);
+    const delay = character === "\n" ? 280 : /[。！？]/.test(character) ? 260 : /[，；：]/.test(character) ? 140 : 50;
+    typewriterTimer = setTimeout(step, delay);
+  };
+  step();
+}
+function completeCurrentAlbumText() {
+  if (!typewriterTimer) return false;
+  stopTypewriter(true);
+  albumState.readPages = [...new Set([...albumState.readPages, albumPageIndex])]; saveAlbumState();
+  revealAlbumCompletion(); return true;
+}
+function albumRecord() {
+  const record = albumState.record || gameStats, entries = [];
+  const player = window.nankaiAccount?.user?.displayName || "南开记忆守护者";
+  entries.push(["探索者", player], ["通关日期", record.finishedAt ? new Date(record.finishedAt).toLocaleDateString("zh-CN") : ""]);
+  const duration = formatDuration(record.startedAt, record.finishedAt); if (duration) entries.push(["总用时", duration]);
+  if (record.completed) entries.push(["完成关卡", `${record.completed}／${stages.length}`]);
+  if (record.total) entries.push(["答题正确率", `${Math.round(record.correct / record.total * 100)}%`]);
+  if (record.clues) entries.push(["调阅线索", `${record.clues}次`]);
+  return entries.filter(([,value]) => value !== "");
+}
+function revealAlbumCompletion() {
+  const reveal = albumPageIndex === 0 ? $("albumRevealText") : albumPageIndex === 4 ? $("albumEndingReveal") : $("albumPhotoReveal");
+  reveal.hidden = true;
+  if (albumPageIndex === 0) $("albumStats").classList.add("visible");
+  if (albumPageIndex === 4) $("albumEndingActions").hidden = false;
+}
+function renderAlbumPage(replay = false) {
+  stopTypewriter(); albumState.currentPage = albumPageIndex; saveAlbumState();
+  if (replay) albumState.readPages = albumState.readPages.filter(page => page !== albumPageIndex);
+  $("albumMemorial").hidden = albumPageIndex !== 0; $("albumPhotoPage").hidden = albumPageIndex < 1 || albumPageIndex > 3; $("albumEnding").hidden = albumPageIndex !== 4;
+  $("albumPrevious").disabled = albumPageIndex === 0; $("albumNext").hidden = albumPageIndex === 4;
+  $("albumProgress").textContent = albumPageIndex === 0 ? "纪念页" : albumPageIndex === 4 ? "最后一页" : `${String(albumPageIndex).padStart(2, "0")}／03`;
+  $("albumPageNumber").textContent = $("albumProgress").textContent;
+  if (albumPageIndex === 0) {
+    $("albumNext").textContent = "开始翻阅"; $("albumStats").classList.remove("visible"); $("albumRevealText").hidden = false;
+    $("albumStats").innerHTML = albumRecord().map(([term,value]) => `<div><dt>${term}</dt><dd>${value}</dd></div>`).join("");
+    typeText($("albumTypedText"), memorialText, revealAlbumCompletion);
+  } else if (albumPageIndex <= 3) {
+    const page = albumPages[albumPageIndex - 1]; $("albumNext").textContent = albumPageIndex === 3 ? "翻到最后一页" : "继续翻阅"; $("albumPhotoReveal").hidden = false;
+    $("albumPhoto").src = page.image; $("albumPhoto").alt = page.caption; $("albumPhotoCaption").textContent = page.title; $("albumPhotoSource").textContent = page.caption;
+    $("albumPhotoPeriod").textContent = page.period; $("albumPhotoTitle").textContent = page.title; typeText($("albumPhotoText"), page.text, revealAlbumCompletion);
+  } else {
+    $("albumEndingActions").hidden = true; $("albumEndingReveal").hidden = false; typeText($("albumEndingText"), endingText, revealAlbumCompletion);
+  }
+}
+function openAlbum(startAt = null) {
+  if (!albumUnlocked()) {
+    $("albumButton").classList.remove("denied"); requestAnimationFrame(() => $("albumButton").classList.add("denied"));
+    showAlbumHint("这本相册里，似乎封存着一段还没有被完整找回的记忆。\n等我们收集完全部线索，再回来看看吧。"); return;
+  }
+  lastAlbumFocus = document.activeElement; albumState.opened = true; saveAlbumState(); $("albumHint").hidden = true;
+  albumPageIndex = startAt ?? (albumState.completedEnding ? 0 : Math.min(albumState.currentPage || 0, 4));
+  $("albumOverlay").hidden = false; document.body.classList.add("album-open"); renderAlbumPage(); $("albumClose").focus();
+}
+function closeAlbum(completed = false) {
+  stopTypewriter(); $("albumOverlay").hidden = true; document.body.classList.remove("album-open");
+  if (completed) { albumState.completedEnding = true; saveAlbumState(); renderAlbumDock(); showAlbumHint("相册已经替你珍藏好了这段旅程。\n你可以回到走过的地方，再看看曾经找到的线索；也可以重新出发，看看下一次是否会发现不同的细节。"); $("albumHintMenu").hidden = false; }
+  lastAlbumFocus?.focus?.();
+}
+function changeAlbumPage(direction) {
+  if (typewriterTimer) { completeCurrentAlbumText(); return; }
+  albumPageIndex = Math.max(0, Math.min(4, albumPageIndex + direction)); renderAlbumPage();
+}
+function resetCurrentGame() {
+  state.completed = []; state.selected = 0; activeChapterIndex = 0;
+  gameStats = { startedAt: null, finishedAt: null, correct: 0, total: 0, clues: 0 }; saveGameStats(); persistProgress(); renderMap(); renderAlbumDock();
 }
 
 function enableMapMovement() {
@@ -639,14 +937,77 @@ function enableMapAgentMovement() {
   });
 }
 
-$("enterGame").addEventListener("click", () => { state.selected = Math.min(state.completed.length, stages.length - 1); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); showChapterIntro(activeChapterIndex); });
+$("enterGame").addEventListener("click", () => { if (!gameStats.startedAt || gameStats.finishedAt) { gameStats.startedAt = Date.now(); gameStats.finishedAt = null; saveGameStats(); } state.selected = Math.min(state.completed.length, stages.length - 1); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); showChapterIntro(activeChapterIndex); });
 $("enterChapter").addEventListener("click", enterActiveChapter);
-$("resetGame").addEventListener("click", () => { safeStorage.remove("nankai-memory-progress"); state.completed = []; state.selected = 0; activeChapterIndex = 0; renderMap(); });
-$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); show("mapScreen"); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("previousQuestion").addEventListener("click", showPreviousQuestion); $("closePreviousReview").addEventListener("click", closePreviousQuestion); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
+$("resetGame").addEventListener("click", resetCurrentGame);
+$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); showMapWithHebao(); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("previousQuestion").addEventListener("click", showPreviousQuestion); $("closePreviousReview").addEventListener("click", closePreviousQuestion); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
 $("closeStagePanel").addEventListener("click", closeStagePanel);
+document.querySelectorAll(".return-cover").forEach(button => button.addEventListener("click", returnToCover));
 $("mapViewport").addEventListener("click", event => { if (!event.target.closest(".stage-node")) closeStagePanel(); });
+document.addEventListener("pointerdown", event => {
+  if (chapterMenuOpen && !event.target.closest("#chapterNav")) setChapterMenuOpen(false);
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && chapterMenuOpen) {
+    event.preventDefault();
+    setChapterMenuOpen(false);
+    $("chapterSelectTrigger")?.focus();
+  }
+});
 enableMapMovement();
 enableMapAgentMovement();
 
+$("albumButton").addEventListener("click", () => openAlbum());
+$("albumHintAction").addEventListener("click", () => openAlbum(0));
+$("albumHintReview").addEventListener("click", () => { $("albumHint").hidden = true; activeChapterIndex = 0; state.selected = 0; renderMap(); showMapWithHebao(); });
+$("albumHintReopen").addEventListener("click", () => openAlbum(0));
+$("albumHintRestart").addEventListener("click", () => { if (!window.confirm("重新开始后，本轮答题进度和用时将被清除，但已经解锁的校史相册仍会为你保留。确定重新开始吗？")) return; $("albumHint").hidden = true; resetCurrentGame(); show("intro"); });
+$("albumClose").addEventListener("click", () => closeAlbum());
+$("albumPrevious").addEventListener("click", () => changeAlbumPage(-1));
+$("albumNext").addEventListener("click", () => changeAlbumPage(1));
+[$("albumTypedText"), $("albumPhotoText"), $("albumEndingText"), $("albumRevealText"), $("albumPhotoReveal"), $("albumEndingReveal")].forEach(element => element.addEventListener("click", completeCurrentAlbumText));
+$("albumReplay").addEventListener("click", () => renderAlbumPage(true));
+$("albumMute").addEventListener("click", () => { albumState.muted = !albumState.muted; saveAlbumState(); $("albumMute").setAttribute("aria-pressed", String(albumState.muted)); $("albumMute").textContent = albumState.muted ? "开启打字音效" : "关闭打字音效"; });
+$("albumFinish").addEventListener("click", () => closeAlbum(true));
+$("albumReviewStages").addEventListener("click", () => { closeAlbum(true); activeChapterIndex = 0; state.selected = 0; renderMap(); showMapWithHebao(); });
+$("albumReadAgain").addEventListener("click", () => { albumPageIndex = 0; renderAlbumPage(); });
+$("albumRestart").addEventListener("click", () => { if (!window.confirm("重新开始后，本轮答题进度和用时将被清除，但已经解锁的校史相册仍会为你保留。确定重新开始吗？")) return; closeAlbum(true); resetCurrentGame(); show("intro"); });
+let albumTouchX = null;
+$("albumBook").addEventListener("touchstart", event => { albumTouchX = event.touches[0]?.clientX ?? null; }, { passive:true });
+$("albumBook").addEventListener("touchend", event => { if (albumTouchX === null) return; const delta = (event.changedTouches[0]?.clientX ?? albumTouchX) - albumTouchX; albumTouchX = null; if (Math.abs(delta) > 70) changeAlbumPage(delta < 0 ? 1 : -1); }, { passive:true });
+
+$("loginTab").addEventListener("click", () => setAccountMode("login"));
+$("registerTab").addEventListener("click", () => setAccountMode("register"));
+$("accountForm").addEventListener("submit", submitAccount);
+$("logoutButton").addEventListener("click", async () => {
+  await window.nankaiAccount.logout();
+  safeStorage.remove("nankai-memory-owner");
+  safeStorage.remove("nankai-memory-progress");
+  state.completed = [];
+  state.selected = 0;
+  activeChapterIndex = 0;
+  renderMap();
+  renderAccount();
+  setAccountMode("login");
+});
+setAccountMode("login");
+initializeAccount();
+if (state.completed.length === stages.length && !albumState.unlocked) unlockAlbum(false);
+$("albumMute").setAttribute("aria-pressed", String(albumState.muted));
+$("albumMute").textContent = albumState.muted ? "开启打字音效" : "关闭打字音效";
+renderAlbumDock();
+
 document.addEventListener("keydown", (event) => { if (!$("quizScreen").hidden && !state.reviewMode && !state.answered && state.question === 0 && /^[1-4]$/.test(event.key)) chooseWalkOption(Number(event.key) - 1); });
+document.addEventListener("keydown", event => {
+  if ($("albumOverlay").hidden) return;
+  if (event.key === "Escape") { event.preventDefault(); closeAlbum(); return; }
+  if (event.key === "ArrowRight") { event.preventDefault(); changeAlbumPage(1); return; }
+  if (event.key === "ArrowLeft") { event.preventDefault(); changeAlbumPage(-1); return; }
+  if (event.key !== "Tab") return;
+  const focusable = [...$("albumOverlay").querySelectorAll("button:not([disabled]):not([hidden]),[tabindex='0']")].filter(element => element.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable.at(-1);
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
 

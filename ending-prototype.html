@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>通关后设计 · 三方案原型</title>
+<style>
+:root{
+  --p950:#16091f; --p900:#260d38; --p800:#3b1454; --p700:#5a1c70; --p600:#742b85;
+  --gold:#d6a94f; --gold-l:#f4d98a; --paper:#eadfc6; --paper-l:#f7efd9;
+  --ink:#2c2230; --muted:#a08f9a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--p950);color:var(--paper-l);font-family:"Noto Serif SC","Songti SC",SimSun,serif;}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--gold-l);outline-offset:3px}
+.wrap{max-width:1180px;margin:0 auto;padding:clamp(1rem,3vw,2rem)}
+h1{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:500;margin:0 0 .4rem}
+.sub{margin:0 0 1.5rem;color:var(--paper);font-size:.95rem;line-height:1.8}
+.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.tab{min-height:44px;padding:.6rem 1.2rem;border:1px solid var(--p700);background:transparent;color:var(--gold-l);border-radius:8px}
+.tab[aria-selected="true"]{background:var(--p700);border-color:var(--gold);color:var(--paper-l)}
+.panel{display:none}
+.panel.on{display:block}
+.stage{position:relative;overflow:hidden;background:#1d0928;border:1px solid var(--p800);border-radius:12px;padding:clamp(1rem,3vw,2rem);min-height:520px}
+.curtain{position:absolute;top:0;bottom:0;width:50%;background:linear-gradient(90deg,#26072f,#6c1f70 22%,#3c0d4c 55%,#26072f);z-index:3;transition:transform .9s cubic-bezier(.76,0,.24,1);pointer-events:none}
+.curtain.l{left:0;transform-origin:left}
+.curtain.r{right:0;transform-origin:right}
+.curtain.l::after,.curtain.r::after{content:"";position:absolute;top:0;bottom:0;width:14px;background:#d0a34d}
+.curtain.l::after{right:0}.curtain.r::after{left:0}
+.stage.open .curtain.l{transform:translateX(-94%)}
+.stage.open .curtain.r{transform:translateX(94%)}
+.eyebrow{margin:0 0 .4rem;letter-spacing:.18em;color:var(--gold);font-size:.75rem}
+h2{margin:0 0 .5rem;font-size:clamp(1.4rem,3vw,2rem);font-weight:500}
+.lead{margin:0 0 1.4rem;color:#c5b79c;font-size:.95rem;line-height:1.8;max-width:44rem}
+.axis{display:flex;align-items:center;margin:1rem 0 .75rem}
+.axis i{width:8px;height:8px;border-radius:50%;background:var(--gold);flex:none}
+.axis s{flex:1;height:1px;background:var(--p700);text-decoration:none}
+.photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem}
+figure{margin:0}
+figure img{width:100%;height:150px;object-fit:cover;border-radius:6px;background:#2c2230;filter:blur(9px) grayscale(.7) brightness(.55);opacity:.5;transition:filter .9s ease,opacity .9s ease}
+figure.on img{filter:none;opacity:1}
+figcaption{margin-top:.4rem;font-size:.8rem;color:var(--paper)}
+figcaption b{display:block;color:var(--gold-l);font-weight:500;font-size:.9rem}
+.hebao{display:flex;gap:.9rem;margin:1.4rem 0;background:var(--p800);border-left:3px solid var(--gold);border-radius:8px;padding:.9rem 1rem;opacity:0;transform:translateY(8px);transition:opacity .5s,transform .5s}
+.stage.open .hebao{opacity:1;transform:none}
+.hebao img{width:44px;height:44px;flex:none}
+.hebao p{margin:0;font-size:.9rem;line-height:1.7}
+.hebao strong{display:block;color:var(--gold-l);font-weight:500;margin-bottom:.2rem}
+.actions{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center}
+.primary{min-height:48px;padding:.7rem 1.5rem;border:2px solid var(--gold);background:var(--p700);color:var(--paper-l);border-radius:6px;transition:transform .2s}
+.primary:hover{transform:translateY(-2px)}
+.ghost{min-height:48px;padding:.7rem 1.5rem;border:1px solid var(--p700);background:transparent;color:var(--gold-l);border-radius:6px}
+.link{border:0;background:transparent;color:var(--muted);text-decoration:underline;min-height:44px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.6rem;margin:1rem 0}
+.case{border:1px solid var(--p700);background:var(--p800);border-radius:6px;padding:.6rem;text-align:left;color:var(--paper-l)}
+.case[aria-pressed="true"]{border-color:var(--gold);background:var(--p700)}
+.case span{display:block;height:46px;background:#241033;border-radius:4px;margin-bottom:.4rem}
+.case b{font-weight:500;font-size:.85rem}
+.case em{display:block;font-style:normal;font-size:.72rem;color:var(--muted)}
+.case.todo{border-style:dashed}
+.corridor{background:#1d0928;border-radius:4px;padding:.5rem;margin:.5rem 0;font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:.5rem}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--gold);flex:none}
+.detail{display:grid;grid-template-columns:180px minmax(0,1fr);gap:1rem;background:var(--p900);border:1px solid var(--p700);border-radius:8px;padding:1rem;margin-top:1rem}
+.detail img{width:100%;height:120px;object-fit:cover;border-radius:4px;background:#2c2230}
+.detail h3{margin:0 0 .4rem;font-size:1.05rem;font-weight:500;color:var(--gold-l)}
+.detail p{margin:0 0 .8rem;font-size:.85rem;line-height:1.75;color:var(--paper)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-top:1rem}
+.card{background:var(--p900);border:1px solid var(--p700);border-radius:8px;padding:1rem}
+.card h3{margin:0 0 .5rem;font-size:.95rem;font-weight:500;color:var(--gold-l)}
+.card p{margin:0;font-size:.82rem;line-height:1.7;color:var(--paper)}
+.card small{display:block;margin-top:.5rem;color:var(--muted);font-size:.72rem}
+.cert{background:var(--paper-l);color:var(--ink);border:1px solid #b79e70;border-radius:6px;padding:1.5rem;max-width:520px}
+.cert .eyebrow{color:#7a6448}
+.cert h3{margin:.6rem 0 1rem;font-size:1.6rem;letter-spacing:.22em;font-weight:500}
+.cert p{font-size:.88rem;line-height:1.9;margin:0 0 1rem}
+.cert input{border:0;border-bottom:1px solid #7a6448;background:transparent;color:var(--p600);font:inherit;text-align:center;width:110px;padding:.1rem}
+.cert .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem}
+.cert .foot div{font-size:.75rem;line-height:1.8;color:#6c5c63}
+.seal{width:64px;height:64px;border-radius:50%;border:2px solid var(--p600);display:grid;place-items:center;text-align:center;color:var(--p600);font-size:.7rem;line-height:1.3;flex:none}
+.note{margin:1rem 0 0;font-size:.72rem;color:#8a7a62}
+.grid2{display:grid;grid-template-columns:minmax(0,520px) minmax(0,1fr);gap:1rem;align-items:start}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem}
+.stat{background:#1d0928;border-radius:6px;padding:.7rem .8rem}
+.stat i{display:block;font-style:normal;font-size:.72rem;color:var(--muted)}
+.stat b{font-size:1.4rem;font-weight:500;color:var(--gold-l)}
+.stat b s{text-decoration:none;font-size:.75rem}
+.hint{margin:1rem 0 0;font-size:.78rem;color:var(--muted);line-height:1.7}
+@media (max-width:760px){.detail,.grid2{grid-template-columns:1fr}.cert{max-width:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}figure img{filter:none;opacity:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>通关后设计 · 三方案原型</h1>
+<p class="sub">全部 14 处地标修复完成后，游戏需要一个收束。三个方案分别是：单页归档仪式、可漫游的记忆长廊、以及两者叠加的三幕收束。点开切换查看，聘书可导出为 PNG。</p>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" aria-selected="true" data-panel="a">方案甲 · 归档仪式</button>
+  <button class="tab" role="tab" aria-selected="false" data-panel="b">方案乙 · 记忆长廊</button>
+  <button class="tab" role="tab" aria-selected="false" data-panel="c">方案丙 · 三幕收束</button>
+</div>
+
+<section class="panel on" id="panel-a" role="tabpanel">
+  <div class="stage" id="stage">
+    <div class="curtain l" aria-hidden="true"></div>
+    <div class="curtain r" aria-hidden="true"></div>
+    <p class="eyebrow">终章 · 百年之后</p>
+    <h2>记忆，已全部归位</h2>
+    <p class="lead">一册散佚于战火、迁校与年代流转之间的校史影像，今天重新合上。</p>
+    <div class="axis" aria-hidden="true"><i></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+    <div class="photos">
+      <figure><img src="assets/final-bank/8306a3182b1b3df7c89559dbabf64fd6bbe6d9f5.jpg" alt="1919 年南开大学开学纪念合影"><figcaption><b>1919</b>开学纪念合影 · 碎片 5/5</figcaption></figure>
+      <figure><img src="assets/final-bank/2871ad3c189760f87815b5d1b3df55301043d1bc6.jpg" alt="1959 年周恩来回母校视察"><figcaption><b>1959</b>总理回母校视察 · 碎片 4/4</figcaption></figure>
+      <figure><img src="assets/final-bank/3cd927c642cbf1fff785fb97cfdf1e102d8f0afd.jpg" alt="2019 年主楼前师生校友合唱"><figcaption><b>2019</b>主楼前唱响祖国 · 碎片 5/5</figcaption></figure>
+    </div>
+    <div class="hebao">
+      <img src="assets/hebao-guide.png" alt="">
+      <div><strong>荷宝</strong><p>十四处地标、三帧影像，你已经把它们从散佚里一处一处找回。这份档案，现在归你保管。</p></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="playBtn">播放仪式</button>
+      <button class="ghost" id="certBtnA">保存证书长图</button>
+      <button class="link" id="skipBtn">跳过</button>
+    </div>
+    <p class="hint">仪式约 60 秒：幕布拉开 → 三帧影像依次显影 → 荷宝致辞 → 授予聘书。减少动态效果模式下直接呈现完成态，跳过按钮在 3 秒后可用。</p>
+  </div>
+</section>
+
+<section class="panel" id="panel-b" role="tabpanel">
+  <div class="stage open">
+    <p class="eyebrow">档案馆 · 记忆长廊</p>
+    <h2>十四座展柜，全部开放</h2>
+    <p class="lead">通关后解锁第四张地图。地标变成展柜沿廊排布，修复员可在走道上自由行走，点开展柜看当年的答题记录与校史讲解。</p>
+    <div class="gallery" id="gallery"></div>
+    <div class="corridor"><span class="dot"></span>长廊走道 · 修复员可自由行走，镜头跟随</div>
+    <div class="detail">
+      <img id="dImg" src="assets/final-bank/8306a3182b1b3df7c89559dbabf64fd6bbe6d9f5.jpg" alt="">
+      <div>
+        <h3 id="dTitle">老校钟</h3>
+        <p id="dText"></p>
+        <div class="actions">
+          <button class="ghost">听荷宝讲解</button>
+          <button class="ghost">重做本地标</button>
+        </div>
+      </div>
+    </div>
+    <p class="hint">入口放在封面与地图页头；未通关时按钮显示“完成全部修复后开放”。展柜数据需要把答题记录写入本地存储，目前答题历史只在内存中。</p>
+  </div>
+</section>
+
+<section class="panel" id="panel-c" role="tabpanel">
+  <div class="stage open">
+    <p class="eyebrow">推荐方案 · 三层收束</p>
+    <h2>仪式给情绪，长廊给去处，空展台给延续</h2>
+    <div class="cards">
+      <div class="card"><h3>幕一 · 归档仪式</h3><p>三照合璧、荷宝致辞、授予聘书。一次性播放，约 60 秒，可跳过。</p><small>P0 · 约 1 天</small></div>
+      <div class="card"><h3>幕二 · 记忆长廊</h3><p>14 座展柜常驻，可回看、可重玩单关，荷宝做讲解员。</p><small>P1 · 约 2 天</small></div>
+      <div class="card"><h3>幕三 · 未完待续</h3><p>长廊尽头的空展台列出影像待补地标，邀请提供老照片线索。</p><small>P2 · 约半天</small></div>
+    </div>
+    <div class="grid2" style="margin-top:1.25rem">
+      <div class="cert">
+        <p class="eyebrow">南开大学档案馆 · 记忆修复任务</p>
+        <h3>修复员聘书</h3>
+        <p>兹有 <input id="nameInput" value="林小舟" aria-label="修复员姓名"> 同学，沿校园地标核验档案，走过三个年代，修复 <b>14</b> 处地标，寻回 <b>3</b> 帧校史影像。特聘为南开记忆修复员。</p>
+        <div class="foot">
+          <div>编号 NK-2026-0417<br>签发 2026 年 10 月 12 日</div>
+          <div class="seal">南开<br>档案</div>
+        </div>
+        <p class="note">本证书为演示原型，校史事实与影像版权以南开大学档案馆复核为准。</p>
+      </div>
+      <div>
+        <div class="stats">
+          <div class="stat"><i>总用时</i><b>42<s> 分钟</s></b></div>
+          <div class="stat"><i>答对</i><b>38<s> / 44</s></b></div>
+          <div class="stat"><i>求助线索</i><b>5<s> 次</s></b></div>
+          <div class="stat"><i>最长连对</i><b>9<s> 题</s></b></div>
+        </div>
+        <p class="hint">最顺的一处：思源堂，三题全对未查线索。<br>卡得最久：木斋图书馆，用了 2 次线索。</p>
+        <div class="actions" style="margin-top:1rem">
+          <button class="primary" id="certBtnC">保存证书长图</button>
+          <button class="ghost" id="shareBtn">复制分享文案</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+<script>
+const tabs=document.querySelectorAll('.tab');
+tabs.forEach(t=>t.addEventListener('click',()=>{
+  tabs.forEach(x=>x.setAttribute('aria-selected',String(x===t)));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id==='panel-'+t.dataset.panel));
+}));
+
+const stage=document.getElementById('stage');
+const figs=[...stage.querySelectorAll('figure')];
+document.getElementById('playBtn').addEventListener('click',()=>{
+  stage.classList.add('open');
+  figs.forEach((f,i)=>setTimeout(()=>f.classList.add('on'),900+i*900));
+});
+document.getElementById('skipBtn').addEventListener('click',()=>{
+  stage.classList.add('open'); figs.forEach(f=>f.classList.add('on'));
+});
+
+const data=[
+ ['老校钟','一','南开精神的起点。你的记录：3 题答对 2 题，用过 1 次线索。'],
+ ['思源堂','一','1923 年建成，原为科学馆。你的记录：3 题全对，未查线索。'],
+ ['秀山堂','一','以李秀山命名。你的记录：3 题全对。'],
+ ['马蹄湖','一','荷宝的诞生地。你的记录：3 题答对 2 题。'],
+ ['木斋图书馆','一','木斋先生捐建。你的记录：卡得最久，用了 2 次线索。'],
+ ['新开湖','二','1950 年代新校园核心。你的记录：3 题全对。'],
+ ['海冰楼','二','以张海冰命名。你的记录：3 题答对 2 题。'],
+ ['文中馆','二','以何文中命名。你的记录：3 题全对。'],
+ ['主楼','二','新南开的中轴线。你的记录：3 题答对 2 题。'],
+ ['周恩来总理像','三','校友周恩来。你的记录：3 题全对。'],
+ ['西南联大纪念碑','三','三校南迁的见证。你的记录：3 题答对 2 题。'],
+ ['逸夫馆','三','邵逸夫捐建。你的记录：3 题全对。'],
+ ['津南中心馆','三','新校区图书馆。你的记录：3 题答对 2 题。'],
+ ['爱国三问碑','三','“你是中国人吗？”。你的记录：3 题全对。']
+];
+const gallery=document.getElementById('gallery');
+data.forEach((item,i)=>{
+  const b=document.createElement('button');
+  const todo=item[0]==='爱国三问碑';
+  b.className='case'+(todo?' todo':'');
+  b.setAttribute('aria-pressed',String(i===0));
+  b.innerHTML='<span></span><b>'+item[0]+'</b><em>'+(todo?'影像待补':'第'+item[1]+'章 · 已修复')+'</em>';
+  b.addEventListener('click',()=>{
+    gallery.querySelectorAll('.case').forEach(c=>c.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');
+    document.getElementById('dTitle').textContent=item[0];
+    document.getElementById('dText').textContent=item[2];
+  });
+  gallery.appendChild(b);
+});
+document.getElementById('dText').textContent=data[0][2];
+
+const rewardImgs=['8306a3182b1b3df7c89559dbabf64fd6bbe6d9f5','2871ad3c189760f87815b5d1b3df55301043d1bc6','3cd927c642cbf1fff785fb97cfdf1e102d8f0afd']
+  .map(n=>{const im=new Image(); im.src='assets/final-bank/'+n+'.jpg'; return im;});
+
+function certCanvas(){
+  const c=document.createElement('canvas'); c.width=1080; c.height=1500;
+  const x=c.getContext('2d');
+  x.fillStyle='#f7efd9'; x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#b79e70'; x.lineWidth=3; x.strokeRect(40,40,c.width-80,c.height-80);
+  x.fillStyle='#7a6448'; x.font='32px serif'; x.fillText('南开大学档案馆 · 记忆修复任务',90,150);
+  x.fillStyle='#2c2230'; x.font='72px serif'; x.fillText('修 复 员 聘 书',90,270);
+  rewardImgs.forEach((im,i)=>{
+    if(im.complete&&im.naturalWidth){ try{ x.drawImage(im,90+i*310,340,290,210);}catch(e){} }
+    else{ x.fillStyle='#c9c2b2'; x.fillRect(90+i*310,340,290,210); }
+    x.fillStyle='#6c5c63'; x.font='22px serif';
+    x.fillText(['1919','1959','2019'][i],90+i*310,585);
+  });
+  x.fillStyle='#3d3340'; x.font='30px serif';
+  const name=document.getElementById('nameInput').value||'　　　';
+  x.fillText('兹有 '+name+' 同学，沿校园地标核验档案，走过三个年代，',90,700);
+  x.fillText('修复 14 处地标，寻回 3 帧校史影像。',90,750);
+  x.fillText('特聘为南开记忆修复员。',90,800);
+  x.fillStyle='#6c5c63'; x.font='24px serif';
+  x.fillText('编号 NK-2026-0417',90,1150);
+  x.fillText('签发 2026 年 10 月 12 日',90,1195);
+  x.strokeStyle='#742b85'; x.lineWidth=5;
+  x.beginPath(); x.arc(880,1130,80,0,Math.PI*2); x.stroke();
+  x.fillStyle='#742b85'; x.font='30px serif'; x.textAlign='center';
+  x.fillText('南开',880,1125); x.fillText('档案',880,1170);
+  x.textAlign='left'; x.fillStyle='#8a7a62'; x.font='20px serif';
+  x.fillText('本证书为演示原型，校史事实与影像版权以南开大学档案馆复核为准。',90,1400);
+  return c;
+}
+function save(){
+  try{
+    certCanvas().toBlob(b=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(b); a.download='南开记忆修复员聘书.png'; a.click();
+    });
+  }catch(e){ alert('导出失败，请通过 http 本地服务打开本页面再试。'); }
+}
+document.getElementById('certBtnA').addEventListener('click',save);
+document.getElementById('certBtnC').addEventListener('click',save);
+document.getElementById('shareBtn').addEventListener('click',()=>{
+  const t='我在《南开记忆修复计划》里走完三个年代，修复 14 处地标，找回了 3 帧校史影像。';
+  navigator.clipboard?.writeText(t);
+});
+</script>
+</body>
+</html>

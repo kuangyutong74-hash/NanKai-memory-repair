@@ -1,6 +1,6 @@
 # 南开记忆修复计划
 
-这是一个与原 `quizmaster` 完全分离的 Python/FastAPI 校史游戏。它只取用原 RAG 文档中的校史知识，玩法、状态、界面和代码均重新实现。
+这是一个基于 Python/FastAPI 与 NK-GeniOS 的校史游戏。玩法、状态、界面和代码均为独立实现。
 
 ## 运行
 
@@ -24,22 +24,32 @@ python run.py
 
 校园地图选地标 → 查看任务与待修复照片 → 完成该建筑的 3—5 道固定题 → 必要时查阅档案线索 → 获得影像碎片 → 阅读校史回顾 → 点亮下一地标。
 
-进度保存在浏览器 `localStorage` 中，可从首页“重新开始”清除。
+游客进度保存在浏览器 `localStorage` 中；注册或登录修复员账号后，进度会同步到服务端 SQLite 存档，可在同一服务的不同设备上继续游戏。首页“重新开始”会同时清除当前账号存档。
 
 ## 荷宝智能体
 
-- `server/agent.py`：Python 编写的中文单字/双字切分、稀疏检索、引用生成与主动行为策略。
+- `server/genios.py`：GeniOS 会话、事件转发与结构化回复适配。
 - `server/game_data.py`：三个章节及十四个地标的服务端数据。
 - `server/app.py`：FastAPI 接口与静态资源服务。
 - `hebao-client.js`：只负责把浏览器游戏事件提交给 Python 智能体并呈现回复。
 - `game.js`：地图、答题、章节切换与学生移动。
 
-默认使用 Python 本地检索，不依赖密钥。后续接入 GeniOS 时，可以在后端增加远程模型适配器，浏览器端无需保存密钥。
+浏览器事件由 FastAPI 后端安全转发给 GeniOS，浏览器端不保存密钥。
 
-运行 Python 智能体测试：
+### GeniOS 接入
+
+复制 `.env.example` 为 `.env`，在 `.env` 中填写平台 API 渠道生成的密钥，然后启动：
 
 ```powershell
-python -m unittest tests.test_python_agent
+python run.py
+```
+
+访问 `http://127.0.0.1:8090/api/health`，`geniosConfigured` 为 `true` 表示后端已读取配置。API 密钥禁止写入前端或提交到仓库。未配置密钥或远程调用失败时，接口会明确返回错误，不会静默切换到其他智能体。
+
+运行 GeniOS 适配层测试：
+
+```powershell
+python -m unittest tests.test_genios
 ```
 
 ## 内容来源

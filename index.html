@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#2a0d3d">
   <title>南开记忆修复计划</title>
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
   <a class="skip-link" href="#game">跳到游戏内容</a>
@@ -22,14 +22,47 @@
           <button id="resetGame" class="text-button">重新开始</button>
         </div>
       </div>
-      <div class="intro-file" aria-label="任务档案摘要">
-        <span>档案编号 NK-1919</span>
-        <strong>散佚影像：3 · 碎片：14</strong>
-        <span>修复员：待登记</span>
+      <div class="intro-side">
+        <div class="intro-file" aria-label="任务档案摘要">
+          <span>档案编号 NK-1919</span>
+          <strong>散佚影像：3 · 碎片：14</strong>
+          <span id="restorerRecord">修复员：待登记</span>
+        </div>
+        <section id="accountPanel" class="account-panel" aria-labelledby="accountTitle">
+          <div id="accountGuest">
+            <div class="account-heading">
+              <div><small>跨设备保存进度</small><strong id="accountTitle">登记修复员档案</strong></div>
+              <div class="account-tabs" role="tablist" aria-label="账号操作">
+                <button id="loginTab" class="active" type="button" role="tab" aria-selected="true">登录</button>
+                <button id="registerTab" type="button" role="tab" aria-selected="false">注册</button>
+              </div>
+            </div>
+            <form id="accountForm" novalidate>
+              <label id="displayNameField" hidden><span>修复员姓名</span><input id="displayName" name="displayName" autocomplete="nickname" maxlength="20" placeholder="在档案中如何称呼你"></label>
+              <label><span>账号</span><input id="accountUsername" name="username" autocomplete="username" minlength="3" maxlength="20" required placeholder="3—20位中文、字母或数字"></label>
+              <label><span>密码</span><input id="accountPassword" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="72" required placeholder="至少8位"></label>
+              <div class="account-submit-row"><button id="accountSubmit" class="account-submit" type="submit">登录并读取存档</button><span id="accountMessage" role="status" aria-live="polite"></span></div>
+            </form>
+            <p class="account-note">也可直接以游客身份开始；游客记录只保存在当前浏览器。</p>
+          </div>
+          <div id="accountSignedIn" class="account-signed-in" hidden>
+            <div><small>修复员档案已接入</small><strong id="accountDisplayName"></strong><span id="accountSyncState">账号存档已同步</span></div>
+            <button id="logoutButton" type="button">退出登录</button>
+          </div>
+        </section>
+        <aside class="intro-agent" aria-live="polite" aria-label="荷宝的任务说明">
+          <div class="intro-agent-portrait"><img src="assets/hebao-guide.png" alt="校史智能体荷宝"></div>
+          <div>
+            <strong>你好，我是荷宝</strong>
+            <p id="introAgentSpeech">我是你的南开校史探索伙伴。接下来我们会沿校园地标核验档案、修复散佚影像，并把找回的记忆重新归档。</p>
+            <small id="introAgentSource" class="agent-source" hidden></small>
+          </div>
+        </aside>
       </div>
     </section>
 
     <section id="chapterIntro" class="screen chapter-intro" hidden aria-labelledby="chapterIntroTitle">
+      <button class="return-cover return-cover-light" type="button">返回封面</button>
       <div class="chapter-intro-backdrop" aria-hidden="true"></div>
       <div class="curtain curtain-left" aria-hidden="true"><i></i></div>
       <div class="curtain curtain-right" aria-hidden="true"><i></i></div>
@@ -47,10 +80,18 @@
     <section id="mapScreen" class="screen map-screen" hidden>
       <header class="game-header">
         <div>
+          <button class="return-cover return-cover-header" type="button">返回封面</button>
           <p>校史影像修复行动</p>
           <h1>南开记忆修复计划</h1>
         </div>
         <nav id="chapterNav" class="chapter-nav" aria-label="校史年代章节"></nav>
+        <aside id="albumDock" class="album-dock" hidden aria-live="polite">
+          <button id="albumButton" class="album-button" type="button" aria-label="校史相册，尚未解锁">
+            <span class="album-sparkles" aria-hidden="true"><i></i><i></i><i></i></span>
+            <img class="album-cover-mini" src="assets/nankai-album-cover.webp" alt="" aria-hidden="true">
+            <span class="album-button-copy"><b>校史相册</b><small id="albumDockStatus">待解锁</small></span>
+          </button>
+        </aside>
         <div class="header-progress" aria-label="总体修复进度">
           <span>已收集碎片</span>
           <strong><b id="restoredCount">0</b> / 14</strong>
@@ -76,7 +117,7 @@
               <img src="assets/student-restorer.png" alt="身穿南开紫外套、携带档案包的学生修复员">
               <span id="studentLocation">修复员 · 校钟</span>
             </div>
-            <aside id="mapAgent" class="map-agent" aria-live="polite">
+            <aside id="mapAgent" class="map-agent open" aria-live="polite">
               <button id="mapAgentHandle" class="map-agent-mascot" type="button" aria-expanded="true" aria-controls="mapAgentBubble" title="拖动荷宝；点击展开或收起提示">
                 <img src="assets/hebao-guide.png" alt="莲藕身体、荷叶帽和荷花包的校史智能体荷宝">
                 <span>荷宝</span>
@@ -113,7 +154,7 @@
 
     <section id="quizScreen" class="screen quiz-screen" hidden>
       <header class="quiz-topbar">
-        <button id="backToMap" class="icon-button" aria-label="返回地图">←</button>
+        <div class="quiz-navigation"><button id="backToMap" class="icon-button" aria-label="返回地图">←</button><button class="return-cover return-cover-header" type="button">返回封面</button></div>
         <div><small id="quizStageRoute"></small><h1 id="quizStageTitle"></h1></div>
         <div id="questionCounter" class="question-counter">1 / 3</div>
       </header>
@@ -149,6 +190,7 @@
     </section>
 
     <section id="storyScreen" class="screen story-screen" hidden>
+      <button class="return-cover return-cover-light" type="button">返回封面</button>
       <div class="woodcut-scene">
         <div class="woodcut-rays"></div>
         <div class="story-copy">
@@ -169,8 +211,79 @@
       </aside>
     </section>
   </main>
-  <script src="hebao-client.js?v=3"></script>
-  <script src="content-data.js?v=2"></script>
-  <script src="game.js?v=22"></script>
+
+  <aside class="album-notice" aria-live="polite">
+    <div id="albumHint" class="album-hint" hidden>
+      <img src="assets/hebao-guide.png" alt="">
+      <div><strong>荷宝</strong><p id="albumHintText"></p><button id="albumHintAction" type="button" hidden>打开校史相册</button><div id="albumHintMenu" class="album-hint-menu" hidden><button id="albumHintReview" type="button">回顾关卡</button><button id="albumHintReopen" type="button">再看相册</button><button id="albumHintRestart" type="button">重新游戏</button></div></div>
+    </div>
+  </aside>
+
+  <div id="albumOverlay" class="album-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="albumPageTitle">
+    <div class="album-shell">
+      <header class="album-toolbar">
+        <span id="albumPageNumber">通关纪念</span>
+        <div>
+          <button id="albumReplay" type="button">重新播放文字</button>
+          <button id="albumMute" type="button" aria-pressed="false">关闭打字音效</button>
+          <button id="albumClose" type="button" aria-label="关闭校史相册">合上</button>
+        </div>
+      </header>
+      <article id="albumBook" class="album-book">
+        <section id="albumMemorial" class="album-spread album-memorial">
+          <div class="album-leaf">
+            <p class="album-file-number">档案编号 NK-1919 · 全卷修复完毕</p>
+            <h2 id="albumPageTitle">校史记忆修复完成</h2>
+            <p id="albumTypedText" class="album-narrative" tabindex="0" title="文字播放时点击可立即显示全文"></p>
+            <button id="albumRevealText" class="album-text-action" type="button">显示全文</button>
+          </div>
+          <div class="album-spine" aria-hidden="true"></div>
+          <div class="album-leaf album-record-leaf">
+            <p class="album-file-number">本轮修复记录</p>
+            <dl id="albumStats" class="album-stats"></dl>
+            <div class="album-seal" aria-label="获得称号：南开记忆守护者">南开记忆<br>守护者</div>
+            <p class="album-turn-note">向后翻页，查看你重新唤醒的三段校史记忆。</p>
+          </div>
+        </section>
+        <section id="albumPhotoPage" class="album-spread album-photo-page" hidden>
+          <figure class="album-photo">
+            <img id="albumPhoto" src="assets/final-bank/8306a3182b1b3df7c89559dbabf64fd6bbe6d9f5.jpg" alt="1919年9月25日南开大学开学纪念合影">
+            <figcaption><strong id="albumPhotoCaption"></strong><span id="albumPhotoSource"></span></figcaption>
+          </figure>
+          <div class="album-spine" aria-hidden="true"></div>
+          <div class="album-leaf album-story-leaf">
+            <p id="albumPhotoPeriod" class="album-file-number"></p>
+            <h2 id="albumPhotoTitle"></h2>
+            <p id="albumPhotoText" class="album-narrative" tabindex="0" title="文字播放时点击可立即显示全文"></p>
+            <button id="albumPhotoReveal" class="album-text-action" type="button">显示全文</button>
+          </div>
+        </section>
+        <section id="albumEnding" class="album-ending" hidden>
+          <div class="album-ending-cover">
+            <div class="album-seal">南开<br>档案</div>
+            <p class="album-file-number">已珍藏 · 南开校史记忆</p>
+            <h2>把记忆交给未来</h2>
+            <p id="albumEndingText" class="album-narrative" tabindex="0" title="文字播放时点击可立即显示全文"></p>
+            <button id="albumEndingReveal" class="album-text-action" type="button">显示全文</button>
+            <div id="albumEndingActions" class="album-ending-actions" hidden>
+              <button id="albumFinish" class="primary-button" type="button">合上相册</button>
+              <button id="albumReviewStages" type="button">回顾关卡</button>
+              <button id="albumReadAgain" type="button">再看相册</button>
+              <button id="albumRestart" type="button">重新游戏</button>
+            </div>
+          </div>
+        </section>
+      </article>
+      <footer class="album-navigation">
+        <button id="albumPrevious" type="button">上一页</button>
+        <span id="albumProgress">纪念页</span>
+        <button id="albumNext" class="primary-button" type="button">开始翻阅</button>
+      </footer>
+    </div>
+  </div>
+  <script src="auth-client.js?v=1"></script>
+  <script src="hebao-client.js?v=6"></script>
+  <script src="content-data.js?v=4"></script>
+  <script src="game.js?v=28"></script>
 </body>
 </html>
