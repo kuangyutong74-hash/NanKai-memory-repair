@@ -15,6 +15,10 @@ assert.match(html, /assets\/nankai-album-cover\.webp/, "album entry should use t
 assert.doesNotMatch(html, /id="albumHint"[\s\S]{0,180}<img/, "album notice must not render a second Hebao portrait");
 assert.match(game, /meta:\{ intent:"album-locked" \}[\s\S]*}, "map"/, "locked album feedback should reuse the map agent");
 assert.match(game, /nankai-memory-album/);
+assert.match(game, /function albumUnlocked\(\) \{ return state\.completed\.length === stages\.length; \}/, "album must unlock from the current run's 14\/14 progress, not a stale persisted flag");
+assert.match(game, /function resetCurrentGame\(\)[\s\S]*?lockAlbumForCurrentRun\(\);[\s\S]*?renderAlbumDock\(\);/, "restarting must lock the album together with cleared stage progress");
+assert.match(game, /function reconcileAlbumWithCurrentRun\(\)[\s\S]*?state\.completed\.length === stages\.length[\s\S]*?if \(albumState\.unlocked\) lockAlbumForCurrentRun\(\)/, "album state must be reconciled against current progress");
+assert.match(game, /async function syncAccountProgress\(\)[\s\S]*?renderMap\(\);\s*reconcileAlbumWithCurrentRun\(\);/, "async account progress must refresh the album lock state after loading");
 assert.match(game, /nankai-memory-stats/);
 assert.match(game, /state\.completed\.length === stages\.length/);
 assert.match(game, /function typeText\(/);
@@ -24,7 +28,7 @@ assert.match(game, /createBufferSource\(\)/, "typewriter should use a mechanical
 assert.match(html, /assets\/nankai-school-song\.mp3[^>]*loop/, "album should contain the looping school song track");
 assert.match(game, /character === "\\n" \? 280/);
 assert.match(game, /prefers-reduced-motion: reduce/);
-assert.match(game, /重新开始后，本轮答题进度和用时将被清除/);
+assert.match(game, /重新开始后，本轮答题进度、用时和相册解锁状态将被清除/);
 assert.match(css, /\.album-overlay/);
 assert.match(css, /@media \(max-width:760px\)/);
 

@@ -128,6 +128,7 @@ async function syncAccountProgress() {
   safeStorage.set("nankai-memory-progress", JSON.stringify(state.completed));
   await window.nankaiAccount.save(state.completed);
   renderMap();
+  reconcileAlbumWithCurrentRun();
 }
 
 async function persistProgress() {
@@ -1012,7 +1013,20 @@ let albumPageIndex = 0, typewriterTimer = null, typewriterText = "", typewriterT
 
 function saveGameStats() { safeStorage.set("nankai-memory-stats", JSON.stringify(gameStats)); }
 function saveAlbumState() { safeStorage.set("nankai-memory-album", JSON.stringify(albumState)); }
-function albumUnlocked() { return albumState.unlocked || state.completed.length === stages.length; }
+function albumUnlocked() { return state.completed.length === stages.length; }
+function lockAlbumForCurrentRun() {
+  albumState = { ...albumState, unlocked: false, opened: false, readPages: [], currentPage: 0, completedEnding: false, record: null };
+  saveAlbumState();
+}
+function reconcileAlbumWithCurrentRun() {
+  if (state.completed.length === stages.length) {
+    if (!albumState.unlocked) unlockAlbum(false);
+    else renderAlbumDock();
+    return;
+  }
+  if (albumState.unlocked) lockAlbumForCurrentRun();
+  renderAlbumDock();
+}
 function formatDuration(startedAt, finishedAt) {
   if (!startedAt || !finishedAt) return "";
   const seconds = Math.max(0, Math.round((finishedAt - startedAt) / 1000));
@@ -1166,7 +1180,7 @@ function changeAlbumPage(direction) {
 }
 function resetCurrentGame() {
   state.completed = []; state.selected = 0; activeChapterIndex = 0;
-  gameStats = { startedAt: null, finishedAt: null, correct: 0, total: 0, clues: 0 }; saveGameStats(); persistProgress(); renderMap(); renderAlbumDock();
+  gameStats = { startedAt: null, finishedAt: null, correct: 0, total: 0, clues: 0 }; saveGameStats(); persistProgress(); lockAlbumForCurrentRun(); renderMap(); renderAlbumDock();
   hebaoChat?.clear();
 }
 
@@ -1235,7 +1249,7 @@ $("albumButton").addEventListener("click", () => openAlbum());
 $("albumHintAction").addEventListener("click", () => openAlbum(0));
 $("albumHintReview").addEventListener("click", () => { $("albumHint").hidden = true; activeChapterIndex = 0; state.selected = 0; renderMap(); showMapWithHebao(); });
 $("albumHintReopen").addEventListener("click", () => openAlbum(0));
-$("albumHintRestart").addEventListener("click", () => { if (!window.confirm("重新开始后，本轮答题进度和用时将被清除，但已经解锁的校史相册仍会为你保留。确定重新开始吗？")) return; $("albumHint").hidden = true; resetCurrentGame(); show("intro"); });
+$("albumHintRestart").addEventListener("click", () => { if (!window.confirm("重新开始后，本轮答题进度、用时和相册解锁状态将被清除。确定重新开始吗？")) return; $("albumHint").hidden = true; resetCurrentGame(); show("intro"); });
 $("albumClose").addEventListener("click", () => closeAlbum());
 $("albumPrevious").addEventListener("click", () => changeAlbumPage(-1));
 $("albumNext").addEventListener("click", () => changeAlbumPage(1));
@@ -1245,7 +1259,7 @@ $("albumMute").addEventListener("click", () => { albumState.muted = !albumState.
 $("albumFinish").addEventListener("click", () => closeAlbum(true));
 $("albumReviewStages").addEventListener("click", () => { closeAlbum(true); activeChapterIndex = 0; state.selected = 0; renderMap(); showMapWithHebao(); });
 $("albumReadAgain").addEventListener("click", () => { albumPageIndex = 0; renderAlbumPage(); });
-$("albumRestart").addEventListener("click", () => { if (!window.confirm("重新开始后，本轮答题进度和用时将被清除，但已经解锁的校史相册仍会为你保留。确定重新开始吗？")) return; closeAlbum(true); resetCurrentGame(); show("intro"); });
+$("albumRestart").addEventListener("click", () => { if (!window.confirm("重新开始后，本轮答题进度、用时和相册解锁状态将被清除。确定重新开始吗？")) return; closeAlbum(true); resetCurrentGame(); show("intro"); });
 let albumTouchX = null;
 $("albumBook").addEventListener("touchstart", event => { albumTouchX = event.touches[0]?.clientX ?? null; }, { passive:true });
 $("albumBook").addEventListener("touchend", event => { if (albumTouchX === null) return; const delta = (event.changedTouches[0]?.clientX ?? albumTouchX) - albumTouchX; albumTouchX = null; if (Math.abs(delta) > 70) changeAlbumPage(delta < 0 ? 1 : -1); }, { passive:true });
@@ -1261,13 +1275,14 @@ $("logoutButton").addEventListener("click", async () => {
   state.completed = [];
   state.selected = 0;
   activeChapterIndex = 0;
+  lockAlbumForCurrentRun();
   renderMap();
   renderAccount();
   setAccountMode("login");
 });
 setAccountMode("login");
 initializeAccount();
-if (state.completed.length === stages.length && !albumState.unlocked) unlockAlbum(false);
+reconcileAlbumWithCurrentRun();
 $("albumMute").setAttribute("aria-pressed", String(albumState.muted));
 $("albumMute").textContent = albumState.muted ? "开启打字音效" : "关闭打字音效";
 document.querySelectorAll(".music-toggle").forEach(button => button.addEventListener("click", toggleGameMusic));
