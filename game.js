@@ -868,8 +868,9 @@ function renderReviewQuestion() {
     options.appendChild(option);
   });
   $("feedback").hidden = false;
+  $("feedback").className = "feedback feedback-review";
   const archivedAnswer = item.type === "sort" ? item.answerText : `${String.fromCharCode(65 + item.answer)} · ${item.options[item.answer]}`;
-  $("feedback").innerHTML = `<strong>归档答案：${archivedAnswer}</strong><br>${item.explanation}`;
+  $("feedback").innerHTML = `<span class="feedback-review-label">校史档案核验记录</span><strong>归档答案：${archivedAnswer}</strong><p>${item.explanation}</p>`;
   hebaoChat?.sceneChanged(`已进入${stage.title}·第${state.question + 1}份档案回顾`);
 }
 function chooseOption(index) { if (state.answered) return; state.chosen = index; [...$("options").children].forEach((el, i) => el.classList.toggle("selected", i === index)); $("submitAnswer").disabled = false; }

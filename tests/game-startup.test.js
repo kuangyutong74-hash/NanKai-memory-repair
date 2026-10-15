@@ -30,5 +30,9 @@ assert.match(css, /hebao-chat-frame-v2\.png/, "Hebao chat should use the non-pix
 assert.match(html, /id="mapCaptionToggle"[^>]+aria-expanded="true"/, "map chapter information should be collapsible");
 assert.match(game, /function toggleMapCaption\(\)/, "map chapter information should expose a persisted toggle");
 assert.match(game, /nankai-memory-map-caption/, "map chapter information preference should persist");
+assert.match(game, /className = "feedback feedback-review"/, "completed-stage review should use its own archive record treatment");
+assert.match(game, /feedback-review-label/, "review feedback should expose a clear archive record label");
+assert.doesNotMatch(css, /\.feedback::before\s*\{/, "neutral review feedback must not reserve an empty status stamp");
+assert.match(css, /\.feedback-correct::before,\.feedback-wrong::before/, "correct and wrong feedback should keep their meaningful status stamps");
 
 console.log("game startup keeps the cover local and map agent expanded");
