@@ -37,19 +37,50 @@ const safeStorage = {
 let savedProgress = [];
 try { savedProgress = JSON.parse(safeStorage.get("nankai-memory-progress", "[]")); } catch { safeStorage.remove("nankai-memory-progress"); }
 if (!Array.isArray(savedProgress)) savedProgress = [];
-const state = { completed: savedProgress, selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0, reviewMode: false, timelineOrder: [], answerHistory: [] };
+const state = { completed: savedProgress, selected: 0, question: 0, correct: 0, chosen: null, answered: false, clueUsed: false, wrongStreak: 0, reviewMode: false, timelineOrder: [], answerHistory: [], retryStage: null };
 let gameStats = { startedAt: null, finishedAt: null, correct: 0, total: 0, clues: 0 };
 let albumState = { unlocked: false, opened: false, readPages: [], currentPage: 0, completedEnding: false, muted: false, record: null };
+let gameMusicEnabled = safeStorage.get("nankai-memory-music", "on") !== "off";
+let mapCaptionCollapsed = safeStorage.get("nankai-memory-map-caption", "expanded") === "collapsed";
+let gameMusicMode = null;
 try { gameStats = { ...gameStats, ...JSON.parse(safeStorage.get("nankai-memory-stats", "{}")) }; } catch { safeStorage.remove("nankai-memory-stats"); }
 try { albumState = { ...albumState, ...JSON.parse(safeStorage.get("nankai-memory-album", "{}")) }; } catch { safeStorage.remove("nankai-memory-album"); }
 const $ = (id) => document.getElementById(id);
-const hebao = new HebaoClient({ endpoint: window.HEBAO_CONFIG?.endpoint || "/api/agent/event", onReply: presentAgent });
+function imageCaptionWithoutSource(text = "") {
+  return String(text).split("（《")[0].trim().replace(/[（(]\s*资料来源[^）)]*[）)]\s*$/, "");
+}
+function imageCaptionWithoutContributor(text = "") {
+  return String(text)
+    .replace(/[；;、]?\s*余老师(?:亦)?提供(?:该照片|原件)?/g, "")
+    .replace(/（\s*[；;、]/g, "（")
+    .replace(/[；;、]\s*）/g, "）")
+    .replace(/（\s*）/g, "")
+    .trim();
+}
+function restorerName() { return window.nankaiAccount?.user?.displayName || "游客修复员"; }
+function restorerGender() { return window.nankaiAccount?.user?.gender === "female" ? "female" : "male"; }
+function restorerSprite() { return restorerGender() === "female" ? "assets/student-restorer-female.png" : "assets/student-restorer.png"; }
+function restorerAlt() { return `${restorerName()}，${restorerGender() === "female" ? "女生" : "男生"}校史记忆修复员`; }
+function syncRestorerVisuals() {
+  const mapImage = $("studentAvatar")?.querySelector("img");
+  if (mapImage) { mapImage.src = restorerSprite(); mapImage.alt = restorerAlt(); }
+  if ($("studentLocation")) $("studentLocation").textContent = restorerName();
+}
+const hebao = new HebaoClient({
+  endpoint: window.HEBAO_CONFIG?.endpoint || "/api/agent/event",
+  onReply: presentAgent,
+  onError: handleAgentError
+});
+let hebaoChat = null;
 let agentNudgeTimer = null;
 let mapAgentBubbleTimer = null;
 let activeChapterIndex = 0;
 let chapterMenuOpen = false;
 let chapterMenuFocusIndex = 0;
 let accountMode = "login";
+let mapHebaoAnimation = null;
+let pendingFollowStage = null;
+let pendingHebaoAtDestination = false;
 
 function setAccountMessage(message, tone = "") {
   const target = $("accountMessage");
@@ -63,10 +94,12 @@ function renderAccount() {
   $("accountSignedIn").hidden = !user;
   if (!user) {
     $("restorerRecord").textContent = "修复员：游客档案";
+    syncRestorerVisuals();
     return;
   }
   $("accountDisplayName").textContent = user.displayName;
   $("restorerRecord").textContent = `修复员：${user.displayName}`;
+  syncRestorerVisuals();
 }
 
 function setAccountMode(mode) {
@@ -78,6 +111,7 @@ function setAccountMode(mode) {
   $("registerTab").setAttribute("aria-selected", String(registering));
   $("displayNameField").hidden = !registering;
   $("displayName").required = registering;
+  $("genderField").hidden = !registering;
   $("accountPassword").autocomplete = registering ? "new-password" : "current-password";
   $("accountSubmit").textContent = registering ? "创建档案并保存进度" : "登录并读取存档";
   setAccountMessage("");
@@ -114,6 +148,7 @@ async function initializeAccount() {
   renderAccount();
   if (window.nankaiAccount.user) {
     try { await syncAccountProgress(); } catch { $("accountSyncState").textContent = "云端暂未同步，本地记录已保留"; }
+    window.nankaiTutorial?.autoFor(window.nankaiAccount.user.username);
   }
 }
 
@@ -123,7 +158,7 @@ async function submitAccount(event) {
   const fields = {
     username: $("accountUsername").value.trim(),
     password: $("accountPassword").value,
-    ...(accountMode === "register" ? { displayName: $("displayName").value.trim() } : {})
+    ...(accountMode === "register" ? { displayName: $("displayName").value.trim(), gender: document.querySelector('input[name="gender"]:checked')?.value || "male" } : {})
   };
   submit.disabled = true;
   setAccountMessage(accountMode === "register" ? "正在建立修复员档案…" : "正在核验档案…");
@@ -133,6 +168,7 @@ async function submitAccount(event) {
     await syncAccountProgress();
     renderAccount();
     $("accountForm").reset();
+    window.nankaiTutorial?.autoFor(window.nankaiAccount.user.username);
   } catch (error) {
     setAccountMessage(error.message, "error");
   } finally {
@@ -148,21 +184,171 @@ function setMapAgentOpen(open, autoClose = false) {
   if (open && autoClose) mapAgentBubbleTimer = setTimeout(() => setMapAgentOpen(false), 5200);
 }
 
+function handleAgentError(error, request) {
+  if (request.surface === "map") {
+    $("mapAgent").classList.remove("compact-message");
+    $("mapAgentSpeech").textContent = "暂时无法连接荷宝，请稍后重新查阅。地图与档案核验仍可继续。";
+    $("mapAgentSource").hidden = true;
+    setMapAgentOpen(true);
+  }
+  hebaoChat?.setAvailability(false);
+}
+
 function presentAgent(reply, surface = "quiz") {
   if (surface === "story") {
-    $("agentReview").textContent = `荷宝：${reply.text}${reply.citations[0] ? `（${reply.citations[0].label}）` : ""}`;
+    hebaoChat?.receiveAgent(reply);
     return;
   }
-  const speech = surface === "intro" ? $("introAgentSpeech") : surface === "map" ? $("mapAgentSpeech") : $("agentSpeech");
-  const source = surface === "intro" ? $("introAgentSource") : surface === "map" ? $("mapAgentSource") : $("agentSource");
+  if (surface === "quiz") { hebaoChat?.receiveAgent(reply); return; }
+  const speech = surface === "intro" ? $("introAgentSpeech") : $("mapAgentSpeech");
+  const source = surface === "intro" ? $("introAgentSource") : $("mapAgentSource");
   speech.textContent = reply.text;
   const labels = reply.citations.map(citation => citation.label);
   source.textContent = labels.join("；");
   source.hidden = labels.length === 0;
-  if (surface === "map") setMapAgentOpen(true);
+  if (surface === "map") {
+    const compactIntents = new Set(["route-locked", "chapter-preview"]);
+    $("mapAgent").classList.toggle("compact-message", compactIntents.has(reply.meta?.intent));
+    setMapAgentOpen(true);
+  }
 }
 
-function show(screen) { ["intro", "chapterIntro", "mapScreen", "quizScreen", "storyScreen"].forEach(id => $(id).hidden = id !== screen); window.scrollTo(0, 0); requestAnimationFrame(renderAlbumDock); }
+function show(screen) {
+  ["intro", "chapterIntro", "mapScreen", "quizScreen", "storyScreen"].forEach(id => $(id).hidden = id !== screen);
+  window.scrollTo(0, 0);
+  requestAnimationFrame(() => {
+    renderAlbumDock();
+    syncChatSurface(screen);
+    if (screen === "mapScreen") window.nankaiTutorial?.autoForSurface("map");
+    if (screen === "quizScreen") window.nankaiTutorial?.autoForSurface("quiz");
+    syncGameMusic(screen);
+  });
+}
+
+function gameMusicTracks() {
+  return { map: $("mapBgm"), quiet: $("stageBgm") };
+}
+function stopGameMusic(reset = false) {
+  Object.values(gameMusicTracks()).forEach(track => {
+    if (!track) return;
+    track.pause();
+    if (reset) track.currentTime = 0;
+  });
+  gameMusicMode = null;
+}
+function startGameMusic(mode) {
+  if (!gameMusicEnabled || !mode) return;
+  const track = gameMusicTracks()[mode];
+  if (!track) return;
+  if (gameMusicMode === mode && !track.paused) return;
+  stopGameMusic();
+  track.volume = mode === "map" ? .32 : .27;
+  gameMusicMode = mode;
+  const playback = track.play();
+  if (playback?.catch) playback.catch(() => { /* 浏览器拦截自动播放时，下一次用户操作会再次尝试 */ });
+}
+function syncMusicButtons() {
+  document.querySelectorAll(".music-toggle").forEach(button => {
+    button.setAttribute("aria-pressed", String(gameMusicEnabled));
+    button.setAttribute("aria-label", gameMusicEnabled ? "关闭游戏音乐" : "开启游戏音乐");
+    button.classList.toggle("muted", !gameMusicEnabled);
+    const label = button.querySelector("span"); if (label) label.textContent = gameMusicEnabled ? "关闭音乐" : "开启音乐";
+  });
+}
+function syncGameMusic(screen = null) {
+  syncMusicButtons();
+  if (!gameMusicEnabled || !$('albumOverlay').hidden) { stopGameMusic(); return; }
+  const page = screen || (!$('mapScreen').hidden ? "mapScreen" : !$('quizScreen').hidden ? "quizScreen" : !$('storyScreen').hidden ? "storyScreen" : !$('chapterIntro').hidden ? "chapterIntro" : "intro");
+  const mode = page === "mapScreen" ? "map" : ["quizScreen", "storyScreen", "chapterIntro"].includes(page) ? "quiet" : null;
+  if (mode) startGameMusic(mode); else stopGameMusic();
+}
+function toggleGameMusic() {
+  gameMusicEnabled = !gameMusicEnabled; safeStorage.set("nankai-memory-music", gameMusicEnabled ? "on" : "off");
+  if (gameMusicEnabled) syncGameMusic(); else { stopGameMusic(); syncMusicButtons(); }
+}
+function syncMapCaption() {
+  const caption = $("mapCaption"), button = $("mapCaptionToggle");
+  if (!caption || !button) return;
+  caption.classList.toggle("collapsed", mapCaptionCollapsed);
+  button.setAttribute("aria-expanded", String(!mapCaptionCollapsed));
+  button.querySelector("b").textContent = mapCaptionCollapsed ? "展开" : "收起";
+  button.setAttribute("aria-label", mapCaptionCollapsed ? "展开章节信息" : "收起章节信息");
+}
+function toggleMapCaption() {
+  mapCaptionCollapsed = !mapCaptionCollapsed;
+  safeStorage.set("nankai-memory-map-caption", mapCaptionCollapsed ? "collapsed" : "expanded");
+  syncMapCaption();
+}
+
+function currentPage() {
+  if (!$('albumOverlay').hidden) return "review";
+  if (!$("quizScreen").hidden) return "quiz";
+  if (!$("mapScreen").hidden) return "map";
+  if (!$("chapterIntro").hidden) return "chapter";
+  if (!$("storyScreen").hidden) return "story";
+  return "intro";
+}
+
+function selectedAnswerForContext(item) {
+  if (state.chosen === null || state.chosen === undefined) return null;
+  if (item.type === "sort") return (state.chosen || []).filter(Boolean).map(id => item.options[Number(id.replace("option-", ""))]);
+  if (item.type === "judge") return state.chosen === "true" ? "正确" : "错误";
+  return item.options[state.chosen] || null;
+}
+
+function currentChatContext() {
+  const page = currentPage();
+  const stage = stages[state.selected] || stages[0];
+  const chapterIndex = Math.max(0, chapterIndexForStage(state.selected));
+  const chapter = chapters[chapterIndex] || chapters[0];
+  const item = page === "quiz" ? stage.questions[state.question] : null;
+  const questionSubmitted = Boolean(item && state.answered);
+  const question = item ? {
+    type: item.type,
+    text: item.text,
+    options: item.options,
+    ...(questionSubmitted || state.reviewMode ? { answer: item.answer, answerText: item.answerText, answerOrder: item.answerOrder, explanation: item.explanation } : {})
+  } : null;
+  const answerGuard = item && !questionSubmitted && !state.reviewMode ? {
+    type: item.type,
+    correctOption: item.type === "choice" ? item.options[item.answer] : null,
+    correctLetter: item.type === "choice" ? String.fromCharCode(65 + item.answer) : null,
+    answerText: item.type === "sort" ? item.answerText : null,
+    answerOrder: item.type === "sort" ? item.answerOrder?.map(index => item.options[index]) : null
+  } : null;
+  const pageLabels = { map: "地图", quiz: state.reviewMode ? "校史回顾" : `第${state.question + 1}份档案`, chapter: "章节序幕", story: "照片修复", review: "校史回顾", intro: "封面" };
+  return {
+    chapterId: chapter.id,
+    chapter: chapter.title,
+    landmark: stage.title,
+    stageId: stage.id,
+    page,
+    questionType: item?.type || null,
+    questionIndex: item ? state.question : null,
+    question,
+    answerGuard,
+    questionSubmitted,
+    wrongStreak: state.wrongStreak,
+    selectedAnswer: item ? selectedAnswerForContext(item) : null,
+    fragments: state.completed.length,
+    unlockedChapters: chapters.filter((_, index) => isChapterUnlocked(index)).map(value => value.title),
+    reviewMode: state.reviewMode,
+    contextLabel: `${stage.title} · ${pageLabels[page]}`,
+    gameRules: "每个地标核验三份档案，至少答对三分之二后获得照片碎片；按路线依次解锁地标，集齐本章碎片可修复章节影像。"
+  };
+}
+
+function syncChatSurface(screen = currentPage()) {
+  if (!hebaoChat) return;
+  const chatSlot = screen === "mapScreen" ? $("mapChatSlot") : screen === "quizScreen" ? $("quizChatSlot") : document.body;
+  if (hebaoChat.trigger.parentElement !== chatSlot) chatSlot.appendChild(hebaoChat.trigger);
+  hebaoChat.trigger.classList.toggle("in-header", chatSlot !== document.body);
+  hebaoChat.setVisible(screen !== "intro");
+  if (screen !== "intro") {
+    const context = currentChatContext();
+    hebaoChat.sceneChanged(`已进入${context.contextLabel}`);
+  }
+}
 function showMapWithHebao() {
   show("mapScreen");
   setMapAgentOpen(true);
@@ -191,13 +377,34 @@ function showChapterIntro(chapterIndex) {
   setTimeout(() => $("enterChapter").focus(), delay);
 }
 function enterActiveChapter() {
+  const chapterIndices = chapterStageIndices(activeChapterIndex);
+  const targetStage = chapterEntryStageIndex(activeChapterIndex);
+  const freshChapterStart = targetStage === chapterIndices[0] && chapterCompletedCount(activeChapterIndex) === 0;
   renderMap();
   showMapWithHebao();
-  setTimeout(() => moveCameraTo(state.selected), 80);
+  pendingFollowStage = freshChapterStart ? targetStage : null;
+  pendingHebaoAtDestination = false;
+  $("followHebao").hidden = !freshChapterStart;
+  if (freshChapterStart) {
+    placeMapHebao(targetStage, true);
+    $("followHebao").textContent = `跟上荷宝，前往${stages[targetStage].title}`;
+    $("mapAgentSpeech").textContent = `${chapters[activeChapterIndex].subtitle}的第一份影像正在等待修复。先从${stages[targetStage].title}开始吧，我在那里等你。`;
+    $("mapAgentSource").hidden = true;
+  } else {
+    placeMapHebao(targetStage);
+    selectStage(targetStage, false, false);
+  }
+  setMapAgentOpen(true);
+  setTimeout(() => moveCameraTo(targetStage), 80);
 }
 function isUnlocked(index) { return index === 0 || state.completed.includes(stages[index - 1].id); }
 function chapterIndexForStage(index) { return chapters.findIndex(chapter => chapter.stageIds.includes(stages[index]?.id)); }
 function chapterStageIndices(chapterIndex = activeChapterIndex) { return chapters[chapterIndex].stageIds.map(id => stages.findIndex(stage => stage.id === id)); }
+function chapterEntryStageIndex(chapterIndex = activeChapterIndex) {
+  const indices = chapterStageIndices(chapterIndex);
+  if (indices.includes(state.selected)) return state.selected;
+  return indices.find(index => isUnlocked(index) && !state.completed.includes(stages[index].id)) ?? indices.at(-1);
+}
 function chapterCompletedCount(chapterIndex) {
   return chapters[chapterIndex].stageIds.filter(id => state.completed.includes(id)).length;
 }
@@ -277,10 +484,11 @@ function notifyLockedRoute({ targetStage = null, targetChapter = null, trigger =
     if (blockingChapter) prerequisite = catalogById[blockingChapter.stageIds.at(-1)];
   }
   const nextStage = stages[reachedStageIndex()];
-  const reply = targetChapter
-    ? { speaker: "荷宝", text: `现在可以预览“${targetChapter.title}”的地图，但关卡尚未解锁。完成上一阶段“${chapters[chapters.indexOf(targetChapter) - 1].title}”后即可进入。`, citations: [], meta: { intent: "chapter-preview" } }
-    : hebao.guardRoute({ targetType: "stage", targetStage, targetChapter, prerequisite, nextStage });
-  presentAgent(reply, "map");
+  if (targetChapter) {
+    presentAgent({ speaker: "荷宝", text: `可以先看看“${targetChapter.title}”的地图。完成上一阶段“${chapters[chapters.indexOf(targetChapter) - 1].title}”后，就能进入关卡。`, citations: [], meta: { intent: "chapter-preview" } }, "map");
+  } else {
+    hebao.guardRoute({ targetType: "stage", targetStage, targetChapter, prerequisite, nextStage });
+  }
   if (trigger) {
     trigger.classList.remove("denied");
     requestAnimationFrame(() => trigger.classList.add("denied"));
@@ -331,15 +539,23 @@ function reachedStageIndex() { return Math.min(state.completed.length, stages.le
 function setStudentPosition(index, animate = false) {
   const avatar = $("studentAvatar"), stage = stages[index];
   avatar.classList.toggle("walking", animate);
-  avatar.style.left = `${stage.walkX}%`;
+  // 修复员在地标右侧落脚，和左侧的荷宝留出清晰的角色间距。
+  avatar.style.left = `${Math.max(14, Math.min(88, stage.x + 8))}%`;
   avatar.style.top = `${stage.walkY}%`;
-  avatar.setAttribute("aria-label", `校史记忆修复员，目前位于${stage.title}`);
-  $("studentLocation").textContent = `修复员 · ${stage.title}`;
+  avatar.setAttribute("aria-label", `${restorerAlt()}，目前位于${stage.title}`);
+  $("studentLocation").textContent = restorerName();
+  syncRestorerVisuals();
 }
 function updateMapAgent(index, travelling = false) {
+  const context = mapGuideContext(index, travelling), stage = stages[index];
+  $("mapAgentSpeech").textContent = `荷宝正在查阅${stage.title}的档案……`;
+  $("mapAgentSource").hidden = true;
+  hebao.guideMap(context);
+}
+function mapGuideContext(index, travelling = false) {
   const stage = stages[index], chapterIndex = chapterIndexForStage(index), chapter = chapters[chapterIndex];
   const fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id);
-  presentAgent(hebao.guideMap({
+  return {
     stage,
     stageIndex: index,
     completed: state.completed.length,
@@ -349,7 +565,54 @@ function updateMapAgent(index, travelling = false) {
     fragmentName: chapter.fragmentNames[fragmentPosition],
     chapterCollected: chapterCompletedCount(chapterIndex),
     chapterTotal: chapter.stageIds.length
-  }), "map");
+  };
+}
+function mapHebaoPoint(index, edge = false) {
+  const stage = stages[index], world = $("mapWorld"), agent = $("mapAgent");
+  // 荷宝从安全边距入场，并在地标左侧停下；不再与右侧修复员重叠。
+  const compactMap = world.clientWidth <= 620;
+  const xPercent = edge ? (compactMap ? 1 : 8) : Math.max(0, Math.min(82, stage.x - (compactMap ? 20 : 12)));
+  // 上、下排地标分别让荷宝停在道路内侧，靠纵向错位避免挤占修复员的站位。
+  const restingY = stage.y < 50 ? (compactMap ? 39 : 28) : 74;
+  const yPercent = edge ? Math.max(14, Math.min(78, restingY + 4)) : restingY;
+  return { left: xPercent / 100 * world.clientWidth, top: yPercent / 100 * world.clientHeight, maxLeft: Math.max(8, world.clientWidth - agent.offsetWidth - 8), maxTop: Math.max(8, world.clientHeight - agent.offsetHeight - 8) };
+}
+function applyMapHebaoPoint(point) {
+  const agent = $("mapAgent"), world = $("mapWorld");
+  const left = Math.min(Math.max(8, point.left), point.maxLeft), top = Math.min(Math.max(8, point.top), point.maxTop);
+  agent.style.left = `${left}px`; agent.style.top = `${top}px`; agent.style.right = "auto"; agent.style.bottom = "auto";
+  agent.classList.toggle("bubble-right", left < world.clientWidth / 2);
+}
+function placeMapHebao(index, edge = false) {
+  mapHebaoAnimation?.cancel(); mapHebaoAnimation = null;
+  applyMapHebaoPoint(mapHebaoPoint(index, edge));
+}
+function scatterFootprints(from, to) {
+  const world = $("mapWorld");
+  world.querySelectorAll(".hebao-footprint").forEach(node => node.remove());
+  for (let step = 1; step <= 6; step++) {
+    const footprint = document.createElement("i"), progress = step / 7;
+    footprint.className = "hebao-footprint";
+    footprint.style.left = `${from.left + (to.left - from.left) * progress + (step % 2 ? -5 : 5)}px`;
+    footprint.style.top = `${from.top + (to.top - from.top) * progress}px`;
+    footprint.style.setProperty("--footprint-angle", `${step % 2 ? -10 : 10}deg`);
+    footprint.style.animationDelay = `${step * 80}ms`;
+    world.appendChild(footprint);
+  }
+  setTimeout(() => world.querySelectorAll(".hebao-footprint").forEach(node => node.remove()), 2600);
+}
+function guideMapHebao(index, onComplete = null) {
+  const agent = $("mapAgent"), world = $("mapWorld"), current = agent.getBoundingClientRect(), parent = world.getBoundingClientRect();
+  const from = { left: current.left - parent.left, top: current.top - parent.top }, to = mapHebaoPoint(index);
+  scatterFootprints(from, to); moveCameraTo(index);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !agent.animate) { applyMapHebaoPoint(to); onComplete?.(); return; }
+  mapHebaoAnimation?.cancel();
+  mapHebaoAnimation = agent.animate([
+    { left: `${from.left}px`, top: `${from.top}px`, transform: "translateY(0)" },
+    { left: `${to.left}px`, top: `${to.top}px`, transform: "translateY(-5px)", offset: .5 },
+    { left: `${to.left}px`, top: `${to.top}px`, transform: "translateY(0)" }
+  ], { duration: 1800, easing: "steps(12, end)", fill: "forwards" });
+  mapHebaoAnimation.onfinish = () => { applyMapHebaoPoint(to); mapHebaoAnimation?.cancel(); mapHebaoAnimation = null; onComplete?.(); };
 }
 function renderMap(studentIndex = reachedStageIndex()) {
   const chapter = chapters[activeChapterIndex], visibleIndices = chapterStageIndices(), nodes = $("stageNodes"); nodes.innerHTML = "";
@@ -392,18 +655,20 @@ function renderMap(studentIndex = reachedStageIndex()) {
   const studentInChapter = stages[studentIndex]?.chapterId === chapter.id;
   $("studentAvatar").hidden = !studentInChapter;
   if (studentInChapter) setStudentPosition(studentIndex, false);
+  placeMapHebao(studentInChapter ? studentIndex : visibleIndices[0]);
   if (chapterUnlocked) updateMapAgent(studentInChapter ? reached : visibleIndices[0]);
   if (!visibleIndices.includes(state.selected)) state.selected = visibleIndices[0];
   selectStage(state.selected, false, false);
 }
 function selectStage(index, focus = true, openPanel = true) {
   state.selected = index; const stage = stages[index], completed = state.completed.includes(stage.id), unlocked = isUnlocked(index);
+  const retrying = state.retryStage === stage.id;
   const chapterIndex = chapterIndexForStage(index), chapter = chapters[chapterIndex], fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id);
-  $("stageRoute").textContent = `记忆路线 · 第${index + 1}站`; $("stageTitle").textContent = stage.title; $("stageSubtitle").textContent = stage.subtitle; $("stageBrief").textContent = stage.brief;
+  $("stageRoute").textContent = `记忆路线 · 第${index + 1}站`; $("stageTitle").textContent = stage.title; $("stageSubtitle").textContent = stage.subtitle;
   $("stageRewardTitle").textContent = `本章目标 · ${chapter.rewardTitle}`;
   renderChapterPuzzle($("stagePuzzle"), chapterIndex);
-  $("stageStatus").textContent = completed ? `已取得${chapter.fragmentNames[fragmentPosition]}碎片` : unlocked ? `完成后获得${chapter.fragmentNames[fragmentPosition]}碎片` : "尚未解锁"; $("stageScore").textContent = completed ? "已归档" : `0 / ${stage.questions.length} 题`;
-  $("startStage").disabled = !unlocked; $("startStage").textContent = completed ? "回顾题目与校史" : unlocked ? "进入档案现场" : "完成上一地标后解锁";
+  $("stageStatus").textContent = completed ? `已取得${chapter.fragmentNames[fragmentPosition]}碎片` : retrying ? "本轮核验未通过，碎片尚未取得" : unlocked ? `完成后获得${chapter.fragmentNames[fragmentPosition]}碎片` : "尚未解锁"; $("stageScore").textContent = completed ? "已归档" : retrying ? "可以再次挑战" : `0 / ${stage.questions.length} 题`;
+  $("startStage").disabled = !unlocked; $("startStage").classList.toggle("retry-button", retrying); $("startStage").textContent = completed ? "回顾题目与校史" : retrying ? "重新寻迹" : unlocked ? "进入档案现场" : "完成上一地标后解锁";
   document.querySelectorAll(".stage-node").forEach(node => node.classList.toggle("selected", Number(node.dataset.stageIndex) === index));
   if (openPanel) { setMapAgentOpen(false); $("stagePanel").classList.add("open"); }
 }
@@ -414,36 +679,26 @@ function startStage() {
   const s = stages[state.selected];
   state.question = 0; state.correct = 0; state.chosen = null; state.answered = false; state.clueUsed = false; state.wrongStreak = 0; state.answerHistory = [];
   state.reviewMode = state.completed.includes(s.id);
+  if (!state.reviewMode) state.retryStage = null;
   $("quizScreen").classList.toggle("review-mode", state.reviewMode);
   $("quizStageRoute").textContent = `第${state.selected + 1}站 · ${state.reviewMode ? "校史回顾" : "档案核验"}`;
   $("quizStageTitle").textContent = s.title;
   show("quizScreen");
   renderQuestion();
 }
-function scheduleAgentNudge() {
-  clearTimeout(agentNudgeTimer);
-  agentNudgeTimer = setTimeout(() => {
-    if (!$("quizScreen").hidden && !state.answered && state.chosen === null) {
-      const stage = stages[state.selected], question = stage.questions[state.question];
-      presentAgent(hebao.nudge({ stage, question }));
-    }
-  }, 9000);
-}
 function renderQuestion() {
   if (state.reviewMode) { renderReviewQuestion(); return; }
   const stage = stages[state.selected], item = stage.questions[state.question]; state.chosen = null; state.answered = false; state.clueUsed = false;
   const assisted = state.wrongStreak >= 2;
-  const introduction = hebao.introduceQuestion({ stage, question: item, questionIndex: state.question, wrongStreak: state.wrongStreak });
-  $("clueButton").hidden = false;
   $("previousQuestion").hidden = state.question === 0 || !state.answerHistory[state.question - 1];
   $("previousReview").hidden = true;
-  $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`; $("difficulty").textContent = assisted ? "智能体辅助" : item.difficulty; $("submitAnswer").disabled = true; $("submitAnswer").textContent = "确认核验"; $("clueButton").disabled = false; $("feedback").className = "feedback"; $("feedback").hidden = true; presentAgent(introduction);
+  $("questionCounter").textContent = `${state.question + 1} / ${stage.questions.length}`; $("difficulty").textContent = assisted ? "问荷宝可获得进阶线索" : item.difficulty; $("submitAnswer").disabled = true; $("submitAnswer").textContent = "确认核验"; $("feedback").className = "feedback"; $("feedback").hidden = true;
   $("options").innerHTML = "";
   renderQuestionMedia(item);
   if (item.type === "judge") renderEvidenceJudgement(item);
   else if (item.type === "sort") renderTimelineSort(item);
   else renderWalkChoice(item, assisted);
-  scheduleAgentNudge();
+  hebaoChat?.sceneChanged(`已进入${stage.title}·第${state.question + 1}份档案`);
 }
 
 function renderQuestionMedia(item) {
@@ -460,7 +715,8 @@ function renderWalkChoice(item, assisted) {
   $("questionText").textContent = item.text;
   const area = $("gameplayArea");
   area.className = "gameplay-area choice-arena";
-  area.innerHTML = `<div class="arena-vignette"></div><img class="arena-player" src="assets/student-restorer.png" alt="校史记忆修复员"><div class="choice-lecterns" role="radiogroup" aria-label="档案选项"></div><p class="arena-instruction">点击档案台走近核验 · 键盘可按 1—4</p>`;
+  area.dataset.position = "start";
+  area.innerHTML = `<div class="arena-vignette"></div><img class="arena-player" src="${restorerSprite()}" alt="${restorerAlt()}"><div class="choice-lecterns" role="radiogroup" aria-label="档案选项"></div><p class="arena-instruction">点击档案台走近核验 · 键盘可按 1—4</p>`;
   const lecterns = area.querySelector(".choice-lecterns");
   item.options.forEach((text, index) => {
     const button = document.createElement("button");
@@ -473,6 +729,8 @@ function renderWalkChoice(item, assisted) {
     const eliminated = item.options.findIndex((_, index) => index !== item.answer);
     lecterns.children[eliminated].disabled = true;
     lecterns.children[eliminated].classList.add("eliminated");
+    lecterns.children[eliminated].setAttribute("aria-label", `${item.options[eliminated]}，该选项已被线索排除，不能选择`);
+    lecterns.children[eliminated].insertAdjacentHTML("beforeend", '<small class="eliminated-label">该选项已被线索排除</small>');
   }
 }
 
@@ -518,7 +776,7 @@ function renderTimelineSort(item) {
   const area = $("gameplayArea");
   area.className = "gameplay-area timeline-room";
   area.style.setProperty("--sort-count", records.length);
-  area.innerHTML = `<div class="timeline-rail" aria-label="从早到晚的四个档案位置"></div><div class="crate-yard" aria-label="待放置档案箱"><p class="yard-label">待放置档案</p></div><img class="timeline-player" src="assets/student-restorer.png" alt="校史记忆修复员"><p class="arena-instruction" aria-live="polite">拖动下方档案箱，放入上方对应的档案位</p>`;
+  area.innerHTML = `<div class="timeline-rail" aria-label="从早到晚的四个档案位置"></div><div class="crate-yard" aria-label="待放置档案箱"><p class="yard-label">待放置档案</p></div><img class="timeline-player" src="${restorerSprite()}" alt="${restorerAlt()}"><p class="arena-instruction" aria-live="polite">拖动下方档案箱，放入上方对应的档案位</p>`;
   const rail = area.querySelector(".timeline-rail"), yard = area.querySelector(".crate-yard");
   mixed.forEach((record, index) => {
     const slot = document.createElement("div");
@@ -597,7 +855,6 @@ function renderReviewQuestion() {
   $("gameplayArea").className = "gameplay-area";
   $("gameplayArea").innerHTML = "";
   $("difficulty").textContent = "校史回顾";
-  $("clueButton").hidden = true;
   $("previousQuestion").hidden = true;
   $("previousReview").hidden = true;
   $("submitAnswer").disabled = false;
@@ -613,10 +870,9 @@ function renderReviewQuestion() {
   $("feedback").hidden = false;
   const archivedAnswer = item.type === "sort" ? item.answerText : `${String.fromCharCode(65 + item.answer)} · ${item.options[item.answer]}`;
   $("feedback").innerHTML = `<strong>归档答案：${archivedAnswer}</strong><br>${item.explanation}`;
-  presentAgent({ speaker: "荷宝", text: `这处地标已经完成修复。现在不用重新作答，我们直接查看第${state.question + 1}份档案的答案与校史依据。`, citations: [{ label: stage.source }], meta: { intent: "review" } });
+  hebaoChat?.sceneChanged(`已进入${stage.title}·第${state.question + 1}份档案回顾`);
 }
 function chooseOption(index) { if (state.answered) return; state.chosen = index; [...$("options").children].forEach((el, i) => el.classList.toggle("selected", i === index)); $("submitAnswer").disabled = false; }
-function useClue() { if (state.answered) return; clearTimeout(agentNudgeTimer); const stage = stages[state.selected], item = stage.questions[state.question]; state.clueUsed = true; gameStats.clues++; saveGameStats(); presentAgent(hebao.giveClue({ stage, question: item })); $("clueButton").disabled = true; $("clueButton").firstChild.textContent = "线索已调阅 "; }
 function answerSummary(item) {
   if (item.type === "sort") return state.chosen.map(id => item.options[Number(id.replace("option-", ""))]).join(" → ");
   if (item.type === "judge") return state.chosen === "true" ? "正确" : "错误";
@@ -649,8 +905,9 @@ function submitAnswer() {
   const timelineExplanation = item.type === "sort" ? `正确顺序：${item.answerOrder.map(index => item.options[index]).join(" → ")}。${item.explanation}` : item.explanation;
   state.answerHistory[state.question] = { index: state.question, question: $("questionText").textContent, answer: answerSummary(item), right, explanation: timelineExplanation };
   $("feedback").className = `feedback ${right ? "feedback-correct" : "feedback-wrong"}`;
-  $("feedback").hidden = false; $("feedback").innerHTML = `<strong>${right ? "核验正确" : "核验错误"}</strong><span>${right ? "答案与档案记录一致" : "答案与档案记录不符"}</span><p>${timelineExplanation}</p>`; $("submitAnswer").textContent = state.question === stages[state.selected].questions.length - 1 ? "完成修复" : "下一份档案"; $("submitAnswer").disabled = false; $("clueButton").disabled = true;
-  presentAgent(hebao.reviewAnswer({ stage: stages[state.selected], question: item, right, clueUsed: state.clueUsed, wrongStreak: state.wrongStreak }));
+  $("feedback").hidden = false; $("feedback").innerHTML = `<strong>${right ? "核验正确" : "核验错误"}</strong><span>${right ? "答案与档案记录一致" : "答案与档案记录不符"}</span><p>${timelineExplanation}</p>`; $("submitAnswer").textContent = state.question === stages[state.selected].questions.length - 1 ? "完成修复" : "下一份档案"; $("submitAnswer").disabled = false;
+  requestAnimationFrame(() => $("feedback").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" }));
+  hebao.reviewAnswer({ stage: stages[state.selected], question: item, right, clueUsed: state.clueUsed, wrongStreak: state.wrongStreak });
 }
 function nextReviewQuestion() {
   const stage = stages[state.selected];
@@ -666,8 +923,11 @@ function nextQuestion() {
   if (state.question < stage.questions.length - 1) { state.question++; renderQuestion(); return; }
   const requiredCorrect = Math.ceil(stage.questions.length * .67);
   if (state.correct < requiredCorrect) {
-    state.question = 0; state.correct = 0; state.answerHistory = []; renderQuestion();
-    presentAgent(hebao.reply(`本轮只完成了部分核验。取得照片碎片至少需要答对${requiredCorrect}题，我们带着刚才的解释再核对一次。`, [], { intent: "retry" }));
+    state.retryStage = stage.id;
+    state.question = 0; state.correct = 0; state.answerHistory = [];
+    activeChapterIndex = chapterIndexForStage(state.selected);
+    renderMap(); showMapWithHebao(); moveCameraTo(state.selected); selectStage(state.selected, false, true);
+    presentAgent({ speaker:"荷宝", text:`这次还差一点。取得照片碎片至少需要答对${requiredCorrect}题，档案卡上已经出现“重新寻迹”，准备好后我们再试一次。`, citations:[], meta:{ intent:"retry" } }, "map");
     return;
   }
   finishStage();
@@ -675,18 +935,24 @@ function nextQuestion() {
 function finishStage() {
   clearTimeout(agentNudgeTimer);
   const stage = stages[state.selected], newlyCompleted = !state.completed.includes(stage.id); if (newlyCompleted) { state.completed.push(stage.id); persistProgress(); }
+  state.retryStage = null;
   const chapterIndex = chapterIndexForStage(state.selected), chapter = chapters[chapterIndex];
   const fragmentPosition = chapter.fragmentStageIds.indexOf(stage.id), chapterComplete = chapterCompletedCount(chapterIndex) === chapter.stageIds.length;
-  $("storyYear").textContent = stage.year; $("storyTitle").textContent = stage.storyTitle; $("storyText").textContent = stage.story; $("storySource").textContent = `资料来源：${stage.source}`;
+  $("storyYear").textContent = stage.year; $("storyTitle").textContent = stage.storyTitle; $("storyText").textContent = stage.story;
   $("storyMedia").hidden = !stage.storyImage;
-  if (stage.storyImage) { $("storyImage").src = stage.storyImage; $("storyImage").alt = stage.storyCaption || `${stage.title}校史图片`; $("storyImageCaption").textContent = stage.storyCaption; }
+  if (stage.storyImage) { $("storyImage").src = stage.storyImage; $("storyImage").alt = stage.storyCaption || `${stage.title}校史图片`; $("storyImageCaption").textContent = imageCaptionWithoutSource(stage.storyCaption || stage.title); }
   $("rewardStatus").textContent = chapterComplete ? "章节影像完整显影" : "获得章节照片碎片";
   renderChapterPuzzle($("rewardPuzzle"), chapterIndex, stage.id);
-  $("restoredCaption").textContent = chapter.rewardCaption;
+  $("restoredCaption").textContent = imageCaptionWithoutSource(chapter.rewardCaption);
   $("fragmentEarned").textContent = chapterComplete ? `已集齐 ${chapter.stageIds.length} 块不规则碎片，“${chapter.rewardTitle}”完整归档。` : `新碎片 +1｜${stage.title}核验完成，寻回“${chapter.rewardTitle}”的${chapter.fragmentNames[fragmentPosition]}。`;
   $("continueJourney").textContent = chapterComplete ? (state.selected === stages.length - 1 ? "收录完整影像，完成修复" : "收录完整影像，开启下一章") : "收好碎片，继续寻迹";
-  const summary = hebao.summarizeStage({ stage, correct: state.correct, chapterComplete, rewardTitle: chapter.rewardTitle, fragmentName: chapter.fragmentNames[fragmentPosition] });
-  $("agentReview").textContent = `荷宝：${summary.text}`; show("storyScreen");
+  $("agentReview").hidden = true;
+  hebao.summarizeStage({ stage, correct: state.correct, chapterComplete, rewardTitle: chapter.rewardTitle, fragmentName: chapter.fragmentNames[fragmentPosition] });
+  const nextStageIndex = state.selected + 1;
+  if (!chapterComplete && nextStageIndex < stages.length) {
+    hebao.prefetchMapGuide(mapGuideContext(nextStageIndex, true));
+  }
+  show("storyScreen");
   if (newlyCompleted && state.completed.length === stages.length) {
     const firstUnlock = !albumState.unlocked;
     gameStats.finishedAt = Date.now(); saveGameStats();
@@ -713,21 +979,25 @@ function journeyToNextStage() {
   closeStagePanel();
   if (isFinal) { setStudentPosition(from); updateMapAgent(from); return; }
   if (changesChapter) {
-    setStudentPosition(next, false);
-    updateMapAgent(next);
+    pendingFollowStage = next;
+    pendingHebaoAtDestination = false;
     showChapterIntro(nextChapterIndex);
     return;
   }
+  pendingFollowStage = null;
+  pendingHebaoAtDestination = false;
+  $("followHebao").hidden = true;
+  $("mapWorld").classList.add("hebao-guiding");
   updateMapAgent(next, true);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    setStudentPosition(next, true);
-    moveCameraTo(next);
-    setTimeout(() => {
-      $("studentAvatar").classList.remove("walking");
-      updateMapAgent(next);
-      document.querySelectorAll(".stage-node").forEach(node => node.classList.toggle("selected", Number(node.dataset.stageIndex) === next));
-    }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 80 : 1900);
-  }));
+  guideMapHebao(next, () => {
+    $("mapWorld").classList.remove("hebao-guiding");
+    $("mapWorld").classList.add("awaiting-follow");
+    pendingFollowStage = next;
+    pendingHebaoAtDestination = true;
+    $("followHebao").textContent = `跟上荷宝，前往${stages[next].title}`;
+    $("followHebao").hidden = false;
+    setMapAgentOpen(true);
+  });
 }
 
 const albumPages = [
@@ -773,14 +1043,36 @@ function unlockAlbum(firstTime = true) {
   showAlbumHint("同学，你找到的每一条线索，都已经回到了它应在的位置。\n\n那本等待已久的相册，也终于被重新唤醒了。\n\n去打开它吧，这一次，它记录的不只是校史，也记录着你的旅程。", true);
 }
 function playTypeClick(index) {
-  if (albumState.muted || index % 3 !== 0 || !window.AudioContext) return;
+  if (albumState.muted || index % 2 !== 0 || !window.AudioContext) return;
   try {
     audioContext ||= new AudioContext();
-    const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
-    oscillator.type = "triangle"; oscillator.frequency.value = 760 + (index % 4) * 35;
-    gain.gain.setValueAtTime(.018, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.0001, audioContext.currentTime + .025);
-    oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + .03);
+    if (audioContext.state === "suspended") audioContext.resume();
+    const now = audioContext.currentTime;
+    const noise = audioContext.createBuffer(1, Math.ceil(audioContext.sampleRate * .045), audioContext.sampleRate);
+    const samples = noise.getChannelData(0);
+    for (let i = 0; i < samples.length; i += 1) samples[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioContext.sampleRate * .007));
+    const strike = audioContext.createBufferSource(), strikeFilter = audioContext.createBiquadFilter(), strikeGain = audioContext.createGain();
+    strike.buffer = noise; strikeFilter.type = "bandpass"; strikeFilter.frequency.value = 1650 + (index % 5) * 95; strikeFilter.Q.value = .72;
+    strikeGain.gain.setValueAtTime(.055, now); strikeGain.gain.exponentialRampToValueAtTime(.0001, now + .042);
+    strike.connect(strikeFilter).connect(strikeGain).connect(audioContext.destination); strike.start(now);
+    const body = audioContext.createOscillator(), bodyGain = audioContext.createGain();
+    body.type = "square"; body.frequency.setValueAtTime(118 + (index % 3) * 9, now); body.frequency.exponentialRampToValueAtTime(72, now + .028);
+    bodyGain.gain.setValueAtTime(.018, now); bodyGain.gain.exponentialRampToValueAtTime(.0001, now + .035);
+    body.connect(bodyGain).connect(audioContext.destination); body.start(now); body.stop(now + .04);
   } catch { /* 音频不可用不影响文字 */ }
+}
+function playAlbumMusic() {
+  const music = $("albumSchoolSong");
+  if (!music) return;
+  music.volume = .34;
+  const playback = music.play();
+  playback?.catch?.(() => { /* 浏览器若阻止自动播放，保留无声相册体验 */ });
+}
+function stopAlbumMusic() {
+  const music = $("albumSchoolSong");
+  if (!music) return;
+  music.pause();
+  music.currentTime = 0;
 }
 function stopTypewriter(showFull = false) {
   clearTimeout(typewriterTimer); typewriterTimer = null;
@@ -841,7 +1133,8 @@ function renderAlbumPage(replay = false) {
     typeText($("albumTypedText"), memorialText, revealAlbumCompletion);
   } else if (albumPageIndex <= 3) {
     const page = albumPages[albumPageIndex - 1]; $("albumNext").textContent = albumPageIndex === 3 ? "翻到最后一页" : "继续翻阅"; $("albumPhotoReveal").hidden = false;
-    $("albumPhoto").src = page.image; $("albumPhoto").alt = page.caption; $("albumPhotoCaption").textContent = page.title; $("albumPhotoSource").textContent = page.caption;
+    const albumCaption = imageCaptionWithoutContributor(page.caption);
+    $("albumPhoto").src = page.image; $("albumPhoto").alt = albumCaption; $("albumPhotoCaption").textContent = page.title; $("albumPhotoSource").textContent = albumCaption;
     $("albumPhotoPeriod").textContent = page.period; $("albumPhotoTitle").textContent = page.title; typeText($("albumPhotoText"), page.text, revealAlbumCompletion);
   } else {
     $("albumEndingActions").hidden = true; $("albumEndingReveal").hidden = false; typeText($("albumEndingText"), endingText, revealAlbumCompletion);
@@ -850,15 +1143,20 @@ function renderAlbumPage(replay = false) {
 function openAlbum(startAt = null) {
   if (!albumUnlocked()) {
     $("albumButton").classList.remove("denied"); requestAnimationFrame(() => $("albumButton").classList.add("denied"));
-    showAlbumHint("这本相册里，似乎封存着一段还没有被完整找回的记忆。\n等我们收集完全部线索，再回来看看吧。"); return;
+    $("albumHint").hidden = true;
+    presentAgent({ speaker:"荷宝", text:"这本相册里，似乎封存着一段还没有被完整找回的记忆。等我们收集完全部线索，再回来看看吧。", citations:[], meta:{ intent:"album-locked" } }, "map");
+    setMapAgentOpen(true);
+    return;
   }
   lastAlbumFocus = document.activeElement; albumState.opened = true; saveAlbumState(); $("albumHint").hidden = true;
   albumPageIndex = startAt ?? (albumState.completedEnding ? 0 : Math.min(albumState.currentPage || 0, 4));
-  $("albumOverlay").hidden = false; document.body.classList.add("album-open"); renderAlbumPage(); $("albumClose").focus();
+  stopGameMusic(); $("albumOverlay").hidden = false; document.body.classList.add("album-open"); renderAlbumPage(); playAlbumMusic(); $("albumClose").focus();
+  hebaoChat?.setVisible(true); hebaoChat?.sceneChanged(`已进入${stages[state.selected]?.title || "南开"}·校史回顾`);
 }
 function closeAlbum(completed = false) {
-  stopTypewriter(); $("albumOverlay").hidden = true; document.body.classList.remove("album-open");
+  stopTypewriter(); stopAlbumMusic(); $("albumOverlay").hidden = true; document.body.classList.remove("album-open");
   if (completed) { albumState.completedEnding = true; saveAlbumState(); renderAlbumDock(); showAlbumHint("相册已经替你珍藏好了这段旅程。\n你可以回到走过的地方，再看看曾经找到的线索；也可以重新出发，看看下一次是否会发现不同的细节。"); $("albumHintMenu").hidden = false; }
+  syncGameMusic();
   lastAlbumFocus?.focus?.();
 }
 function changeAlbumPage(direction) {
@@ -868,6 +1166,7 @@ function changeAlbumPage(direction) {
 function resetCurrentGame() {
   state.completed = []; state.selected = 0; activeChapterIndex = 0;
   gameStats = { startedAt: null, finishedAt: null, correct: 0, total: 0, clues: 0 }; saveGameStats(); persistProgress(); renderMap(); renderAlbumDock();
+  hebaoChat?.clear();
 }
 
 function enableMapMovement() {
@@ -878,69 +1177,31 @@ function enableMapMovement() {
   viewport.addEventListener("keydown", event => { if (["ArrowRight", "d", "D"].includes(event.key)) viewport.scrollBy({ left: 280, behavior: "smooth" }); if (["ArrowLeft", "a", "A"].includes(event.key)) viewport.scrollBy({ left: -280, behavior: "smooth" }); if (["ArrowDown", "s", "S"].includes(event.key)) viewport.scrollBy({ top: 220, behavior: "smooth" }); if (["ArrowUp", "w", "W"].includes(event.key)) viewport.scrollBy({ top: -220, behavior: "smooth" }); });
 }
 
-function enableMapAgentMovement() {
-  const agent = $("mapAgent"), handle = $("mapAgentHandle"), world = $("mapWorld");
-  let pointerId = null, startX = 0, startY = 0, startLeft = 0, startTop = 0, moved = false;
-
-  const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
-  const place = (left, top, remember = false) => {
-    const safe = 10;
-    const x = clamp(left, safe, world.clientWidth - agent.offsetWidth - safe);
-    const y = clamp(top, safe, world.clientHeight - agent.offsetHeight - safe);
-    agent.style.left = `${x}px`; agent.style.top = `${y}px`; agent.style.right = "auto"; agent.style.bottom = "auto";
-    agent.classList.toggle("bubble-right", x < world.clientWidth / 2);
-    if (remember) safeStorage.set("hebao-map-position", JSON.stringify({ x: x / world.clientWidth, y: y / world.clientHeight }));
-  };
-
-  let saved = null;
-  try { saved = JSON.parse(safeStorage.get("hebao-map-position", "null")); } catch { safeStorage.remove("hebao-map-position"); }
-  if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) requestAnimationFrame(() => place(saved.x * world.clientWidth, saved.y * world.clientHeight));
-
-  handle.addEventListener("pointerdown", event => {
-    event.preventDefault(); event.stopPropagation();
-    const rect = agent.getBoundingClientRect(), parent = world.getBoundingClientRect();
-    pointerId = event.pointerId; moved = false; startX = event.clientX; startY = event.clientY;
-    startLeft = rect.left - parent.left; startTop = rect.top - parent.top;
-    agent.classList.add("dragging"); handle.setPointerCapture(pointerId);
-  });
-  handle.addEventListener("pointermove", event => {
-    if (event.pointerId !== pointerId) return;
-    const dx = event.clientX - startX, dy = event.clientY - startY;
-    if (Math.hypot(dx, dy) > 4) moved = true;
-    if (moved) place(startLeft + dx, startTop + dy);
-  });
-  const finish = event => {
-    if (event.pointerId !== pointerId) return;
-    if (moved) {
-      const rect = agent.getBoundingClientRect(), parent = world.getBoundingClientRect();
-      place(rect.left - parent.left, rect.top - parent.top, true);
-    } else setMapAgentOpen(!agent.classList.contains("open"));
-    agent.classList.remove("dragging"); pointerId = null;
-  };
-  handle.addEventListener("pointerup", finish); handle.addEventListener("pointercancel", finish);
-  handle.addEventListener("click", event => {
-    event.stopPropagation();
-    if (event.detail === 0) setMapAgentOpen(!agent.classList.contains("open"));
-  });
-  handle.addEventListener("keydown", event => {
-    const movement = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[event.key];
-    if (!movement) return;
-    event.preventDefault(); event.stopPropagation();
-    const rect = agent.getBoundingClientRect(), parent = world.getBoundingClientRect();
-    place(rect.left - parent.left + movement[0], rect.top - parent.top + movement[1], true);
-  });
-  $("mapAgentDismiss").addEventListener("click", event => { event.stopPropagation(); setMapAgentOpen(false); handle.focus(); });
-  agent.addEventListener("click", event => event.stopPropagation());
-  window.addEventListener("resize", () => {
-    const rect = agent.getBoundingClientRect(), parent = world.getBoundingClientRect();
-    place(rect.left - parent.left, rect.top - parent.top);
-  });
-}
-
 $("enterGame").addEventListener("click", () => { if (!gameStats.startedAt || gameStats.finishedAt) { gameStats.startedAt = Date.now(); gameStats.finishedAt = null; saveGameStats(); } state.selected = Math.min(state.completed.length, stages.length - 1); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); showChapterIntro(activeChapterIndex); });
 $("enterChapter").addEventListener("click", enterActiveChapter);
+$("followHebao").addEventListener("click", () => {
+  const targetStage = pendingFollowStage ?? chapterEntryStageIndex(activeChapterIndex);
+  const moveStudent = () => {
+    $("mapWorld").classList.remove("awaiting-follow");
+    setStudentPosition(targetStage, true);
+    moveCameraTo(targetStage);
+    setTimeout(() => {
+      $("studentAvatar").classList.remove("walking");
+      $("mapWorld").classList.remove("hebao-guiding");
+      pendingFollowStage = null;
+      pendingHebaoAtDestination = false;
+      updateMapAgent(targetStage);
+      selectStage(targetStage, false, true);
+    }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 80 : 1900);
+  };
+  $("followHebao").hidden = true;
+  $("mapWorld").classList.add("hebao-guiding");
+  setMapAgentOpen(false);
+  if (pendingHebaoAtDestination) moveStudent();
+  else guideMapHebao(targetStage, moveStudent);
+});
 $("resetGame").addEventListener("click", resetCurrentGame);
-$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); showMapWithHebao(); moveCameraTo(state.selected); }); $("clueButton").addEventListener("click", useClue); $("previousQuestion").addEventListener("click", showPreviousQuestion); $("closePreviousReview").addEventListener("click", closePreviousQuestion); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
+$("startStage").addEventListener("click", startStage); $("backToMap").addEventListener("click", () => { clearTimeout(agentNudgeTimer); state.reviewMode = false; $("quizScreen").classList.remove("review-mode"); activeChapterIndex = Math.max(0, chapterIndexForStage(state.selected)); renderMap(); showMapWithHebao(); moveCameraTo(state.selected); }); $("previousQuestion").addEventListener("click", showPreviousQuestion); $("closePreviousReview").addEventListener("click", closePreviousQuestion); $("submitAnswer").addEventListener("click", submitAnswer); $("continueJourney").addEventListener("click", journeyToNextStage);
 $("closeStagePanel").addEventListener("click", closeStagePanel);
 document.querySelectorAll(".return-cover").forEach(button => button.addEventListener("click", returnToCover));
 $("mapViewport").addEventListener("click", event => { if (!event.target.closest(".stage-node")) closeStagePanel(); });
@@ -955,7 +1216,19 @@ document.addEventListener("keydown", event => {
   }
 });
 enableMapMovement();
-enableMapAgentMovement();
+$("mapAgentHandle").addEventListener("click", event => { event.stopPropagation(); setMapAgentOpen(!$("mapAgent").classList.contains("open")); });
+$("mapAgentDismiss").addEventListener("click", event => { event.stopPropagation(); setMapAgentOpen(false); $("mapAgentHandle").focus(); });
+$("mapAgent").addEventListener("click", event => event.stopPropagation());
+hebaoChat = new HebaoChat({
+  client: hebao,
+  contextProvider: currentChatContext,
+  onOpenChange(open) {
+    $("game").classList.toggle("chat-open", open);
+    document.body.classList.toggle("hebao-chat-open", open);
+    if (open) mapHebaoAnimation?.pause(); else mapHebaoAnimation?.play();
+  }
+});
+syncChatSurface();
 
 $("albumButton").addEventListener("click", () => openAlbum());
 $("albumHintAction").addEventListener("click", () => openAlbum(0));
@@ -980,6 +1253,7 @@ $("loginTab").addEventListener("click", () => setAccountMode("login"));
 $("registerTab").addEventListener("click", () => setAccountMode("register"));
 $("accountForm").addEventListener("submit", submitAccount);
 $("logoutButton").addEventListener("click", async () => {
+  await hebaoChat?.clear();
   await window.nankaiAccount.logout();
   safeStorage.remove("nankai-memory-owner");
   safeStorage.remove("nankai-memory-progress");
@@ -995,6 +1269,10 @@ initializeAccount();
 if (state.completed.length === stages.length && !albumState.unlocked) unlockAlbum(false);
 $("albumMute").setAttribute("aria-pressed", String(albumState.muted));
 $("albumMute").textContent = albumState.muted ? "开启打字音效" : "关闭打字音效";
+document.querySelectorAll(".music-toggle").forEach(button => button.addEventListener("click", toggleGameMusic));
+syncMusicButtons();
+$("mapCaptionToggle").addEventListener("click", toggleMapCaption);
+syncMapCaption();
 renderAlbumDock();
 
 document.addEventListener("keydown", (event) => { if (!$("quizScreen").hidden && !state.reviewMode && !state.answered && state.question === 0 && /^[1-4]$/.test(event.key)) chooseWalkOption(Number(event.key) - 1); });

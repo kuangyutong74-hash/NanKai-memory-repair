@@ -11,6 +11,7 @@ const errors = [];
 
 for (const [name, viewport] of [["desktop",{width:1440,height:900}],["mobile",{width:390,height:844}]]) {
   const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => { localStorage.setItem("nankai-memory-tutorial-v1:guest:map", "done"); localStorage.setItem("nankai-memory-tutorial-v1:guest:quiz", "done"); });
   page.on("pageerror", error => errors.push(`${name}: ${error.message}`));
   await page.route("http://nankai.local/**", async route => {
     const url = new URL(route.request().url());
@@ -34,6 +35,12 @@ for (const [name, viewport] of [["desktop",{width:1440,height:900}],["mobile",{w
   });
   if (result.bodyWidth > result.viewportWidth) errors.push(`${name}: horizontal overflow ${result.bodyWidth}/${result.viewportWidth}`);
   if (result.menu.left < 0 || result.menu.right > result.viewportWidth) errors.push(`${name}: stage menu outside viewport`);
+  await page.locator("#chapterSelectTrigger").click();
+  await page.locator("#albumButton").click();
+  const lockedAlbum = await page.evaluate(() => ({ hintHidden:document.querySelector("#albumHint").hidden, visibleHebaoPortraits:[...document.querySelectorAll('#mapAgent img[src="assets/hebao-guide.png"]')].filter(image => image.getBoundingClientRect().width > 0 && image.getBoundingClientRect().height > 0).length, speech:document.querySelector("#mapAgentSpeech").textContent }));
+  if (!lockedAlbum.hintHidden) errors.push(`${name}: locked album opened a second Hebao panel`);
+  if (lockedAlbum.visibleHebaoPortraits !== 1) errors.push(`${name}: expected one visible Hebao portrait, found ${lockedAlbum.visibleHebaoPortraits}`);
+  if (!lockedAlbum.speech.includes("相册")) errors.push(`${name}: locked album feedback did not reach the map agent`);
   await page.screenshot({ path:path.join(output, `${name}.png`), fullPage:true });
   console.log(JSON.stringify({ name, result }));
   await page.close();

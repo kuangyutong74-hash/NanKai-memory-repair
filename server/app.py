@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .game_data import chapter_payload
-from .genios import GeniosError, genios
+from .genios import GeniosError, GeniosSafetyError, genios
 from .auth import AuthError, load_save, login, register, revoke, save_progress, user_for_token
 
 ROOT = Path(__file__).absolute().parents[1]
@@ -23,6 +23,10 @@ class AgentRequest(BaseModel):
     context: dict[str, Any] = Field(default_factory=dict)
 
 
+class ConversationResetRequest(BaseModel):
+    user_id: str = Field(alias="userId", min_length=1, max_length=80)
+
+
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=20)
     password: str = Field(min_length=8, max_length=72)
@@ -30,6 +34,7 @@ class Credentials(BaseModel):
 
 class Registration(Credentials):
     display_name: str = Field(alias="displayName", min_length=1, max_length=20)
+    gender: Literal["male", "female"] = "male"
 
 
 class SaveRequest(BaseModel):
@@ -66,7 +71,7 @@ def _current_user(authorization: str | None) -> tuple[str, dict[str, Any]]:
 @app.post("/api/auth/register")
 def auth_register(request: Registration) -> dict[str, Any]:
     try:
-        return register(request.username, request.password, request.display_name)
+        return register(request.username, request.password, request.display_name, request.gender)
     except AuthError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -110,6 +115,8 @@ async def agent_event(request: AgentRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="GeniOS API 尚未配置")
     try:
         reply = await genios.send_event(request.event, request.context)
+    except GeniosSafetyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (GeniosError, httpx.HTTPError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=f"GeniOS 调用失败：{str(exc)[:160]}") from exc
     reply.setdefault("speaker", "荷宝")
@@ -118,13 +125,19 @@ async def agent_event(request: AgentRequest) -> dict[str, Any]:
     return reply
 
 
+@app.post("/api/agent/reset")
+def reset_agent_conversation(request: ConversationResetRequest) -> dict[str, bool]:
+    genios.reset_conversation(request.user_id)
+    return {"ok": True}
+
+
 app.mount("/assets", StaticFiles(directory=ROOT / "assets"), name="assets")
 app.mount("/tests", StaticFiles(directory=ROOT / "tests"), name="tests")
 
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(ROOT / "index.html")
+    return FileResponse(ROOT / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/{filename:path}")
@@ -132,4 +145,5 @@ def static_file(filename: str) -> FileResponse:
     target = (ROOT / filename).absolute()
     if ROOT not in target.parents or not target.is_file():
         return FileResponse(ROOT / "index.html")
-    return FileResponse(target)
+    headers = {"Cache-Control": "no-cache"} if target.suffix.lower() in {".html", ".css", ".js"} else None
+    return FileResponse(target, headers=headers)

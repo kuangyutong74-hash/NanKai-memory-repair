@@ -17,9 +17,10 @@ class AuthStorageTests(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_register_login_and_save_round_trip(self):
-        registration = auth.register("修复员001", "archive-1919", "小南")
+        registration = auth.register("修复员001", "archive-1919", "小南", "female")
         user = auth.user_for_token(registration["token"])
         self.assertEqual(user["displayName"], "小南")
+        self.assertEqual(user["gender"], "female")
 
         saved = auth.save_progress(user["id"], ["origin-bell", "origin-bell", "origin-library"])
         self.assertEqual(saved["completed"], ["origin-bell", "origin-library"])
@@ -27,6 +28,7 @@ class AuthStorageTests(unittest.TestCase):
 
         login = auth.login("修复员001", "archive-1919")
         self.assertEqual(login["user"]["username"], "修复员001")
+        self.assertEqual(login["user"]["gender"], "female")
 
     def test_duplicate_username_and_wrong_password_are_rejected(self):
         auth.register("nankai_user", "archive-1919", "荷花")

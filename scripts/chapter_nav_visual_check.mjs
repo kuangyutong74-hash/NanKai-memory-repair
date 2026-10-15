@@ -13,6 +13,7 @@ const errors = [];
 
 for (const [name, viewport] of [["desktop", { width: 1440, height: 900 }], ["mobile", { width: 390, height: 844 }]]) {
   const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => { localStorage.setItem("nankai-memory-tutorial-v1:guest:map", "done"); localStorage.setItem("nankai-memory-tutorial-v1:guest:quiz", "done"); });
   page.on("console", message => {
     if (message.type() === "error" && message.text() !== "Failed to load resource: net::ERR_FAILED" && !message.text().includes("file:///D:/api/agent/event")) errors.push(`${name}: ${message.text()}`);
   });

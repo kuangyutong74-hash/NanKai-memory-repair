@@ -43,6 +43,7 @@ def initialize() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE COLLATE NOCASE,
                 display_name TEXT NOT NULL,
+                gender TEXT NOT NULL DEFAULT 'male',
                 password_hash TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
@@ -59,6 +60,9 @@ def initialize() -> None:
             );
             """
         )
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)").fetchall()}
+        if "gender" not in columns:
+            connection.execute("ALTER TABLE users ADD COLUMN gender TEXT NOT NULL DEFAULT 'male'")
 
 
 def _now() -> datetime:
@@ -89,7 +93,8 @@ def _verify_password(password: str, encoded: str) -> bool:
 
 
 def _public_user(row: sqlite3.Row) -> dict[str, Any]:
-    return {"id": row["id"], "username": row["username"], "displayName": row["display_name"]}
+    gender = row["gender"] if "gender" in row.keys() else "male"
+    return {"id": row["id"], "username": row["username"], "displayName": row["display_name"], "gender": gender}
 
 
 def _issue_session(connection: sqlite3.Connection, user_id: int) -> str:
@@ -104,7 +109,7 @@ def _issue_session(connection: sqlite3.Connection, user_id: int) -> str:
     return token
 
 
-def register(username: str, password: str, display_name: str) -> dict[str, Any]:
+def register(username: str, password: str, display_name: str, gender: str = "male") -> dict[str, Any]:
     username = username.strip()
     display_name = display_name.strip()
     if not USERNAME_PATTERN.fullmatch(username):
@@ -113,12 +118,14 @@ def register(username: str, password: str, display_name: str) -> dict[str, Any]:
         raise AuthError("密码需为8—72位")
     if not display_name or len(display_name) > 20:
         raise AuthError("修复员姓名需为1—20位")
+    if gender not in {"male", "female"}:
+        raise AuthError("请选择修复员形象")
     now = _timestamp()
     try:
         with _connect() as connection:
             cursor = connection.execute(
-                "INSERT INTO users(username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?)",
-                (username, display_name, _hash_password(password), now),
+                "INSERT INTO users(username, display_name, gender, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                (username, display_name, gender, _hash_password(password), now),
             )
             connection.execute(
                 "INSERT INTO saves(user_id, completed_json, updated_at) VALUES (?, '[]', ?)",

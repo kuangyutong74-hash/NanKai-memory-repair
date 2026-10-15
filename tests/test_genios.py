@@ -36,6 +36,34 @@ class GeniosClientTests(unittest.TestCase):
         self.assertEqual(first, GeniosClient.normalize_user_id("browser-user"))
         self.assertLessEqual(len(first), 20)
 
+    def test_unsubmitted_question_removes_answer_fields(self):
+        compact = GeniosClient._compact_context({
+            "questionSubmitted": False,
+            "reviewMode": False,
+            "question": {"type": "choice", "text": "题目", "options": ["甲", "乙"], "answer": 1, "explanation": "解析"},
+        })
+        self.assertNotIn("answer", compact["question"])
+        self.assertNotIn("explanation", compact["question"])
+
+    def test_blocks_direct_choice_letter_without_receiving_answer(self):
+        context = {"questionSubmitted": False, "reviewMode": False, "question": {"type": "choice", "options": ["甲", "乙"]}}
+        self.assertTrue(GeniosClient._leaks_unsubmitted_answer({"text": "正确答案是选项 B"}, context))
+        self.assertFalse(GeniosClient._leaks_unsubmitted_answer({"text": "请先留意材料中反复出现的用途描述。"}, context))
+
+    def test_answer_guard_is_used_but_not_forwarded_to_genios(self):
+        context = {
+            "questionSubmitted": False,
+            "question": {"type": "choice", "options": ["甲", "老校钟失踪"]},
+            "answerGuard": {"correctOption": "老校钟失踪", "correctLetter": "B"},
+        }
+        compact = GeniosClient._compact_context(context)
+        self.assertNotIn("answerGuard", compact)
+        self.assertTrue(GeniosClient._leaks_unsubmitted_answer({"text": "线索表明老校钟失踪。"}, context))
+
+    def test_review_mode_allows_complete_explanation(self):
+        context = {"questionSubmitted": True, "reviewMode": True, "question": {"type": "judge", "options": []}}
+        self.assertFalse(GeniosClient._leaks_unsubmitted_answer({"text": "答案是正确。"}, context))
+
     def test_decodes_direct_agent_json(self):
         value = {"action": "introduce_game", "message": "欢迎", "evidence": []}
         self.assertEqual(GeniosClient._decode_response_text(json.dumps(value)), value)

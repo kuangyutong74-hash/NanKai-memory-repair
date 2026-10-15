@@ -28,6 +28,7 @@ async function reachImageQuestion(page) {
 
 for (const [name, viewport] of [["desktop", { width: 1440, height: 1000 }], ["mobile", { width: 390, height: 844 }]]) {
   const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => { localStorage.setItem("nankai-memory-tutorial-v1:guest:map", "done"); localStorage.setItem("nankai-memory-tutorial-v1:guest:quiz", "done"); });
   await reachImageQuestion(page);
   await page.screenshot({ path: path.join(output, `${name}.png`), fullPage: true });
   await page.close();
